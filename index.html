@@ -30,23 +30,15 @@
 <body>
     <div id="canvas-container"></div>
     <div id="measurement"></div>
-
-    <!-- Three.js and controls from CDN -->
+    <!-- Three.js and OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/DragControls.js"></script>
-
     <script>
         // ----- Scene Setup -----
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x444444);
 
-        const camera = new THREE.PerspectiveCamera(
-            60,
-            window.innerWidth / window.innerHeight,
-            0.1,
-            1000
-        );
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(50, 50, 50);
         camera.lookAt(0, 0, 0);
 
@@ -56,146 +48,152 @@
 
         // ----- Controls -----
         const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
-        // Mouse buttons
-        orbitControls.mouseButtons = {
-            MIDDLE: THREE.MOUSE.PAN,
-            // MIDDLE: THREE.MOUSE.DOLLY,
-            SCROLL: THREE.MOUSE.DOLLY,
-            // MIDDLE: THREE.MOUSE.PAN
-        }
+        orbitControls.mouseButtons = { MIDDLE: THREE.MOUSE.PAN, SCROLL: THREE.MOUSE.DOLLY };
 
-        // ----- Grid Helper (for reference) -----
+        // ----- Grid Helper -----
         const gridHelper = new THREE.GridHelper(100, 100);
         scene.add(gridHelper);
 
         // ----- Lighting -----
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
-
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
         directionalLight.position.set(50, 50, 50);
         scene.add(directionalLight);
 
-        // ----- Ground Plane (for raycasting when drawing) -----
-        // We use a mathematical plane (y = 0) rather than a visible mesh.
+        // ----- Ground Plane (for raycasting) -----
         const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
         // ----- Measurement Display -----
         const measurementDiv = document.getElementById("measurement");
 
-        // ----- Group to hold all beams -----
+        // ----- Group to hold beams -----
         const beamsGroup = new THREE.Group();
         scene.add(beamsGroup);
 
-        // OTHER VARIABLES
-        // For snapping during drag:
-        let currentDraggedBeam = null;  // The beam currently being dragged.
-        let lastMouseEvent = null;        // Last mouse event (to get clientX/clientY).
-        let lastPointerWorld = new THREE.Vector3(); // Last mouse pointer in world space.
-        // 0: left, 1: right, 2: top, 3: bottom, 4: front, 5: back
-        // Default to 3 (bottom face) so that the dragged beam sits on top of a target.
-        let activeSnapFaceIndex = 3;
-        let dragOffset = new THREE.Vector3();  // Offset from the beam’s origin to the grab point.
+        // --- Variables for Drag & Snapping ---
+        let currentDraggedBeam = null; // The beam being dragged.
+        let lastMouseEvent = null;
+        // For anchoring the drag, store initial beam position, its face data, and the pointer ground intersection.
+        let dragInitialBeamPos = new THREE.Vector3();
+        // dragInitialFaceCenters will be an array of objects { faceType, center, normal } (in world space) captured at pointerdown.
+        let dragInitialFaceCenters = [];
+        let dragInitialPointer = new THREE.Vector3();
 
-        let dragInitialBeamPos = new THREE.Vector3();  // Beam’s position at pointerdown.
-        let dragInitialFaceCenters = [];  // Array of the beam's face centers (world positions) at pointerdown.
-        let dragInitialPointer = new THREE.Vector3();  // Ground intersection at pointerdown.
-
-
-        // ----- Drag Controls for beams -----
-        // (They let you click and drag an existing beam.)
-
-        // const dragControls = new THREE.DragControls(beamsGroup.children, camera, renderer.domElement);
-
-        // dragControls.addEventListener("dragstart", function (event) {
-        //     orbitControls.enabled = false;
-        //     currentDraggedBeam = event.object;
-        // });
-
-        // dragControls.addEventListener("dragend", function (event) {
-        //     orbitControls.enabled = true;
-        //     currentDraggedBeam = null;
-        //     // Here you could update a measurement display if you want.
-        // });
-
-        // dragControls.addEventListener("drag", function (event) {
-        //     if (currentDraggedBeam && lastMouseEvent) {
-        //         // Update the raycaster using the latest mouse event.
-        //         pointer.x = (lastMouseEvent.clientX / window.innerWidth) * 2 - 1;
-        //         pointer.y = -(lastMouseEvent.clientY / window.innerHeight) * 2 + 1;
-        //         raycaster.setFromCamera(pointer, camera);
-
-        //         // Find the first intersected beam (other than the dragged beam)
-        //         const intersects = raycaster.intersectObjects(beamsGroup.children, true);
-        //         let targetBeam = null;
-        //         let targetIntersection = null;
-        //         for (let inter of intersects) {
-        //             if (inter.object !== currentDraggedBeam) {
-        //                 targetBeam = inter.object;
-        //                 targetIntersection = inter.point;
-        //                 break;
-        //             }
-        //         }
-
-        //         if (targetBeam && targetIntersection) {
-        //             // For the target beam, pick the face whose center is closest to the intersection point.
-        //             const targetFace = getClosestFace(targetBeam, targetIntersection);
-
-        //             // For the dragged beam, determine which face should be used.
-        //             // (Option 1: Use the active snap face index, or...)
-        //             const draggedFaces = getBeamFaceCenters(currentDraggedBeam);
-        //             // Option 2: Choose the dragged face that is closest to the target face.
-        //             let bestMovingFace = draggedFaces[activeSnapFaceIndex];
-        //             let bestDistance = bestMovingFace.position.distanceTo(targetFace.position);
-        //             draggedFaces.forEach(face => {
-        //                 const d = face.position.distanceTo(targetFace.position);
-        //                 if (d < bestDistance) {
-        //                     bestDistance = d;
-        //                     bestMovingFace = face;
-        //                 }
-        //             });
-
-        //             // Compute the offset needed so that bestMovingFace’s center aligns with the targetFace’s center.
-        //             const offset = new THREE.Vector3().subVectors(targetFace.position, bestMovingFace.position);
-        //             // Move the dragged beam by that offset.
-        //             currentDraggedBeam.position.add(offset);
-        //             currentDraggedBeam.updateMatrixWorld();
-        //         }
-        //     }
-        // });
-
-        // ----- Variables for drawing beams -----
+        // --- Variables for Drawing ---
         let isDrawing = false;
         let startPoint = new THREE.Vector3();
         let previewLine = null;
+
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
 
-        // Utility function to get the intersection point on the ground
+        // Utility: Get ground intersection point.
         function getGroundIntersection(clientX, clientY) {
             pointer.x = (clientX / window.innerWidth) * 2 - 1;
-            pointer.y = - (clientY / window.innerHeight) * 2 + 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(pointer, camera);
             const intersection = new THREE.Vector3();
             raycaster.ray.intersectPlane(groundPlane, intersection);
             return intersection;
         }
 
-        function getTopFace(beam) {
-            const faces = getBeamFaceCenters(beam);
-            let topFace = faces[0];
-            let maxDot = -Infinity;
-            const up = new THREE.Vector3(0, 1, 0);
-            faces.forEach(face => {
-                const dot = face.normal.dot(up);
-                if (dot > maxDot) {
-                    maxDot = dot;
-                    topFace = face;
-                }
+        // Helper: getBeamFaceCenters
+        // Returns an array of objects { faceType, center, normal } in world space.
+        function getBeamFaceCenters(beam) {
+            const length = beam.userData.length;
+            const height = beam.userData.height;
+            const depth = beam.userData.depth;
+            const localFaces = [
+                { faceType: "left", pos: new THREE.Vector3(0, 0, 0), normal: new THREE.Vector3(-1, 0, 0) },
+                { faceType: "right", pos: new THREE.Vector3(length, 0, 0), normal: new THREE.Vector3(1, 0, 0) },
+                { faceType: "top", pos: new THREE.Vector3(length / 2, height / 2, 0), normal: new THREE.Vector3(0, 1, 0) },
+                { faceType: "bottom", pos: new THREE.Vector3(length / 2, -height / 2, 0), normal: new THREE.Vector3(0, -1, 0) },
+                { faceType: "front", pos: new THREE.Vector3(length / 2, 0, depth / 2), normal: new THREE.Vector3(0, 0, 1) },
+                { faceType: "back", pos: new THREE.Vector3(length / 2, 0, -depth / 2), normal: new THREE.Vector3(0, 0, -1) }
+            ];
+            const faces = [];
+            localFaces.forEach(face => {
+                const center = face.pos.clone();
+                beam.localToWorld(center);
+                const normal = face.normal.clone().applyQuaternion(beam.quaternion);
+                faces.push({ faceType: face.faceType, center: center, normal: normal });
             });
-            return topFace;
+            return faces;
         }
 
+        // Helper: getFaceUnderCursor
+        // Given a beam and a pointer event, returns the face (object with faceType, center, normal) whose plane is hit.
+        function getFaceUnderCursor(beam, event) {
+            const pointerVec = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            raycaster.setFromCamera(pointerVec, camera);
+            const ray = raycaster.ray;
+            const faces = getBeamFaceCenters(beam);
+            const { length, height, depth } = beam.userData;
+            let validFaces = [];
+            faces.forEach(face => {
+                // Create a plane for this face.
+                const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(face.normal.clone().normalize(), face.center);
+                const intersection = new THREE.Vector3();
+                if (ray.intersectPlane(plane, intersection)) {
+                    let localIntersection = intersection.clone();
+                    beam.worldToLocal(localIntersection);
+                    let inside = false;
+                    switch (face.faceType) {
+                        case "left":
+                            if (Math.abs(localIntersection.x - 0) < 0.01 &&
+                                localIntersection.y >= -height / 2 && localIntersection.y <= height / 2 &&
+                                localIntersection.z >= -depth / 2 && localIntersection.z <= depth / 2)
+                                inside = true;
+                            break;
+                        case "right":
+                            if (Math.abs(localIntersection.x - length) < 0.01 &&
+                                localIntersection.y >= -height / 2 && localIntersection.y <= height / 2 &&
+                                localIntersection.z >= -depth / 2 && localIntersection.z <= depth / 2)
+                                inside = true;
+                            break;
+                        case "top":
+                            if (Math.abs(localIntersection.y - height / 2) < 0.01 &&
+                                localIntersection.x >= 0 && localIntersection.x <= length &&
+                                localIntersection.z >= -depth / 2 && localIntersection.z <= depth / 2)
+                                inside = true;
+                            break;
+                        case "bottom":
+                            if (Math.abs(localIntersection.y + height / 2) < 0.01 &&
+                                localIntersection.x >= 0 && localIntersection.x <= length &&
+                                localIntersection.z >= -depth / 2 && localIntersection.z <= depth / 2)
+                                inside = true;
+                            break;
+                        case "front":
+                            if (Math.abs(localIntersection.z - depth / 2) < 0.01 &&
+                                localIntersection.x >= 0 && localIntersection.x <= length &&
+                                localIntersection.y >= -height / 2 && localIntersection.y <= height / 2)
+                                inside = true;
+                            break;
+                        case "back":
+                            if (Math.abs(localIntersection.z + depth / 2) < 0.01 &&
+                                localIntersection.x >= 0 && localIntersection.x <= length &&
+                                localIntersection.y >= -height / 2 && localIntersection.y <= height / 2)
+                                inside = true;
+                            break;
+                    }
+                    if (inside) {
+                        const dist = intersection.distanceTo(camera.position);
+                        validFaces.push({ face: face, intersection: intersection, distance: dist });
+                    }
+                }
+            });
+            if (validFaces.length > 0) {
+                validFaces.sort((a, b) => a.distance - b.distance);
+                return validFaces[0].face;
+            }
+            return null;
+        }
+
+        // Helper: snapDirection – snaps a vector to one of the six cardinal axes.
         function snapDirection(direction) {
             const axes = [
                 new THREE.Vector3(1, 0, 0),
@@ -217,63 +215,32 @@
             return bestAxis;
         }
 
+        // Keydown: Cycle active snap face for dragged beam.
         window.addEventListener("keydown", function (event) {
             if (event.key.toLowerCase() === 'f' && currentDraggedBeam) {
-                // Cycle through the six faces.
                 activeSnapFaceIndex = (activeSnapFaceIndex + 1) % 6;
                 console.log("Active snap face index:", activeSnapFaceIndex);
-
-                // Optionally, immediately update the snapping position:
-                if (lastMouseEvent) {
-                    pointer.x = (lastMouseEvent.clientX / window.innerWidth) * 2 - 1;
-                    pointer.y = -(lastMouseEvent.clientY / window.innerHeight) * 2 + 1;
-                    raycaster.setFromCamera(pointer, camera);
-                    const intersects = raycaster.intersectObjects(beamsGroup.children, true);
-                    let targetBeam = null;
-                    for (let inter of intersects) {
-                        if (inter.object !== currentDraggedBeam) {
-                            targetBeam = inter.object;
-                            break;
-                        }
-                    }
-                    if (targetBeam) {
-                        const targetFace = getTopFace(targetBeam);
-                        const draggedFaces = getBeamFaceCenters(currentDraggedBeam);
-                        const movingFace = draggedFaces[activeSnapFaceIndex];
-                        const offset = new THREE.Vector3().subVectors(targetFace.position, movingFace.position);
-                        currentDraggedBeam.position.add(offset);
-                        currentDraggedBeam.updateMatrixWorld();
-                    }
-                }
             }
         });
 
-        renderer.domElement.addEventListener("pointerdown", function (event) {
-            if (event.button !== 0) return; // Only use left mouse button.
-
-            // Set up the raycaster.
+        // ----- Custom Drag & Drawing Handlers -----
+        window.addEventListener("pointerdown", function (event) {
+            if (event.button !== 0) return;
             pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
             pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(pointer, camera);
-
-            // Check if we hit an existing beam.
             const intersects = raycaster.intersectObjects(beamsGroup.children, true);
             if (intersects.length > 0) {
-                // Start dragging the first intersected beam.
                 currentDraggedBeam = intersects[0].object;
-                // Store its initial position.
                 dragInitialBeamPos.copy(currentDraggedBeam.position);
-                // Store its face centers (deep clones) at the moment of the grab.
+                // Store initial face data.
                 dragInitialFaceCenters = getBeamFaceCenters(currentDraggedBeam).map(face => {
-                    return { position: face.position.clone(), normal: face.normal.clone() };
+                    return { faceType: face.faceType, center: face.center.clone(), normal: face.normal.clone() };
                 });
-                // Store the ground intersection point at the moment of grab.
                 dragInitialPointer.copy(getGroundIntersection(event.clientX, event.clientY));
             } else {
-                // No beam hit → start drawing a new beam.
                 isDrawing = true;
                 startPoint.copy(getGroundIntersection(event.clientX, event.clientY));
-                // Create the preview line.
                 const geometry = new THREE.BufferGeometry().setFromPoints([startPoint, startPoint.clone()]);
                 const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
                 previewLine = new THREE.Line(geometry, material);
@@ -281,17 +248,14 @@
             }
         });
 
-        renderer.domElement.addEventListener("pointermove", function (event) {
-            // If dragging a beam:
+        window.addEventListener("pointermove", function (event) {
+            lastMouseEvent = event;
             if (currentDraggedBeam) {
-                // Compute the current ground intersection from the pointer.
                 const currentPointer = getGroundIntersection(event.clientX, event.clientY);
-                // Compute the displacement (delta) from the initial pointer position.
                 const delta = new THREE.Vector3().subVectors(currentPointer, dragInitialPointer);
-                // Compute the free-drag candidate position (if there were no snapping).
                 const freeCandidate = new THREE.Vector3().addVectors(dragInitialBeamPos, delta);
 
-                // Temporarily remove the dragged beam so the raycast doesn’t hit it.
+                // Temporarily remove dragged beam for raycasting.
                 beamsGroup.remove(currentDraggedBeam);
                 pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
                 pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -303,39 +267,41 @@
                     targetIntersection = inter.point;
                     break;
                 }
-                // Re-add the dragged beam.
                 beamsGroup.add(currentDraggedBeam);
 
-                // Start with the free candidate position.
                 let finalPos = freeCandidate.clone();
                 if (targetBeam && targetIntersection) {
-                    // Determine the target face that was hit.
-                    const targetFace = getHitFace(targetBeam, targetIntersection);
+                    // Use getFaceUnderCursor to lock in the target face.
+                    const targetFace = getFaceUnderCursor(targetBeam, event);
                     if (targetFace && targetFace.center) {
-                        // Get a normalized normal from the target face.
-                        const n = targetFace.normal.clone().normalize();
-
-                        // Compute where the dragged beam's designated face would be if the beam were at the free candidate.
-                        // We stored the initial dragged face center at pointerdown (for the active snap face).
-                        // Then, if the beam moves by (freeCandidate - dragInitialBeamPos),
-                        // its active face would move by the same offset:
-                        const initialDraggedFace = dragInitialFaceCenters[activeSnapFaceIndex];
-                        const candidateDraggedFace = initialDraggedFace.clone().add(freeCandidate.clone().sub(dragInitialBeamPos));
-
-                        // Compute the displacement between the target face center and the candidate dragged face.
-                        const d = new THREE.Vector3().subVectors(targetFace.center, candidateDraggedFace);
-                        // Project this displacement onto the target face's normal.
-                        const adjustment = n.clone().multiplyScalar(d.dot(n));
-                        // Only adjust the free candidate by the normal component.
-                        finalPos.add(adjustment);
+                        // Instead of matching the same face, choose the dragged face that best aligns with the OPPOSITE of the target face's normal.
+                        let bestCandidateFace = null;
+                        let bestDot = -Infinity;
+                        const oppositeNormal = targetFace.normal.clone().negate();
+                        dragInitialFaceCenters.forEach(face => {
+                            const dot = face.normal.dot(oppositeNormal);
+                            if (dot > bestDot) {
+                                bestDot = dot;
+                                bestCandidateFace = face;
+                            }
+                        });
+                        if (bestCandidateFace) {
+                            // Compute where the dragged beam’s candidate face would be if the beam were at freeCandidate.
+                            const candidateDraggedFace = bestCandidateFace.center.clone().add(
+                                freeCandidate.clone().sub(dragInitialBeamPos)
+                            );
+                            // Compute the difference vector between target face center and candidate dragged face.
+                            const d = new THREE.Vector3().subVectors(targetFace.center, candidateDraggedFace);
+                            // Project this difference onto the target face’s normal.
+                            const adjustment = targetFace.normal.clone().multiplyScalar(d.dot(targetFace.normal));
+                            finalPos.add(adjustment);
+                        }
                     }
                 }
-                // Update the dragged beam's position.
+
                 currentDraggedBeam.position.copy(finalPos);
                 currentDraggedBeam.updateMatrixWorld();
             }
-
-            // If drawing a new beam:
             if (isDrawing && previewLine) {
                 const currentPoint = getGroundIntersection(event.clientX, event.clientY);
                 previewLine.geometry.setFromPoints([startPoint, currentPoint]);
@@ -344,37 +310,25 @@
             }
         });
 
-        renderer.domElement.addEventListener("pointerup", function (event) {
-            // End dragging if one is in progress.
+        window.addEventListener("pointerup", function (event) {
             if (currentDraggedBeam) {
                 currentDraggedBeam = null;
                 dragInitialBeamPos.set(0, 0, 0);
                 dragInitialFaceCenters = [];
                 dragInitialPointer.set(0, 0, 0);
             }
-
-            // Finalize drawing a new beam.
             if (isDrawing && previewLine) {
                 const endPoint = getGroundIntersection(event.clientX, event.clientY);
                 const distance = startPoint.distanceTo(endPoint);
                 if (distance > 0.1) {
-                    // Create the beam.
                     const beamHeight = 1.5;
                     const beamDepth = 3.5;
                     const geometry = new THREE.BoxGeometry(distance, beamHeight, beamDepth);
-                    // Translate so that the left face is at the local origin.
                     geometry.translate(distance / 2, 0, 0);
                     const material = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
                     const beam = new THREE.Mesh(geometry, material);
-                    // Store dimensions for later snapping.
-                    beam.userData = {
-                        length: distance,
-                        height: beamHeight,
-                        depth: beamDepth
-                    };
-                    // Position the beam so its left face is at the start point.
+                    beam.userData = { length: distance, height: beamHeight, depth: beamDepth };
                     beam.position.copy(startPoint);
-                    // Determine its orientation based on the drawn direction, snapping to a cardinal axis.
                     const direction = new THREE.Vector3().subVectors(endPoint, startPoint).normalize();
                     const snappedDir = snapDirection(direction);
                     const quaternion = new THREE.Quaternion();
@@ -382,7 +336,6 @@
                     beam.quaternion.copy(quaternion);
                     beamsGroup.add(beam);
                 }
-                // Clean up the preview line.
                 scene.remove(previewLine);
                 previewLine.geometry.dispose();
                 previewLine.material.dispose();
@@ -392,104 +345,12 @@
             }
         });
 
-        // Returns an array of face objects, each with a world position and normal.
-        function getBeamFaceCenters(beam) {
-            // Retrieve dimensions from userData:
-            const length = beam.userData.length;
-            const height = beam.userData.height;
-            const depth = beam.userData.depth;
-            // Define the six face centers in the beam’s local space.
-            // (Remember: we translated the geometry so that the left face is at x=0.)
-            const localFaces = [
-                { pos: new THREE.Vector3(0, 0, 0), normal: new THREE.Vector3(-1, 0, 0) }, // Left face
-                { pos: new THREE.Vector3(length, 0, 0), normal: new THREE.Vector3(1, 0, 0) },  // Right face
-                { pos: new THREE.Vector3(length / 2, height / 2, 0), normal: new THREE.Vector3(0, 1, 0) },  // Top face
-                { pos: new THREE.Vector3(length / 2, -height / 2, 0), normal: new THREE.Vector3(0, -1, 0) }, // Bottom face
-                { pos: new THREE.Vector3(length / 2, 0, depth / 2), normal: new THREE.Vector3(0, 0, 1) },  // Front face
-                { pos: new THREE.Vector3(length / 2, 0, -depth / 2), normal: new THREE.Vector3(0, 0, -1) }  // Back face
-            ];
-
-            const faces = [];
-            localFaces.forEach(face => {
-                // Compute the center in world coordinates:
-                const center = face.pos.clone();
-                beam.localToWorld(center);
-                // Compute the world normal (based on the beam's rotation).
-                const normal = face.normal.clone().applyQuaternion(beam.quaternion);
-                // Return an object with properties "center" and "normal".
-                faces.push({ center: center, normal: normal });
-            });
-            return faces;
-        }
-
-
-        function getHitFace(beam, intersectionPoint) {
-            // Convert the intersection point to the beam’s local space.
-            let localPoint = intersectionPoint.clone();
-            beam.worldToLocal(localPoint);
-            const { length, height, depth } = beam.userData;
-
-            // Compute distances from the point to each face's plane in local space.
-            let distLeft = Math.abs(localPoint.x - 0);
-            let distRight = Math.abs(localPoint.x - length);
-            let distBottom = Math.abs(localPoint.y + height / 2);
-            let distTop = Math.abs(localPoint.y - height / 2);
-            let distBack = Math.abs(localPoint.z + depth / 2);
-            let distFront = Math.abs(localPoint.z - depth / 2);
-
-            // Find the minimal distance.
-            let minDist = Math.min(distLeft, distRight, distBottom, distTop, distFront, distBack);
-            let faceType = "";
-            if (minDist === distLeft) faceType = "left";
-            else if (minDist === distRight) faceType = "right";
-            else if (minDist === distBottom) faceType = "bottom";
-            else if (minDist === distTop) faceType = "top";
-            else if (minDist === distFront) faceType = "front";
-            else if (minDist === distBack) faceType = "back";
-
-            // Determine the local center of that face.
-            let localCenter = new THREE.Vector3();
-            switch (faceType) {
-                case "left": localCenter.set(0, 0, 0); break;
-                case "right": localCenter.set(length, 0, 0); break;
-                case "bottom": localCenter.set(length / 2, -height / 2, 0); break;
-                case "top": localCenter.set(length / 2, height / 2, 0); break;
-                case "front": localCenter.set(length / 2, 0, depth / 2); break;
-                case "back": localCenter.set(length / 2, 0, -depth / 2); break;
-            }
-
-            // Convert the local center back to world coordinates.
-            let worldCenter = localCenter.clone();
-            beam.localToWorld(worldCenter);
-
-            // Compute the face normal in local space.
-            let localNormal = new THREE.Vector3();
-            switch (faceType) {
-                case "left": localNormal.set(-1, 0, 0); break;
-                case "right": localNormal.set(1, 0, 0); break;
-                case "bottom": localNormal.set(0, -1, 0); break;
-                case "top": localNormal.set(0, 1, 0); break;
-                case "front": localNormal.set(0, 0, 1); break;
-                case "back": localNormal.set(0, 0, -1); break;
-            }
-            // Transform the local normal by the beam’s rotation.
-            let worldNormal = localNormal.clone().applyQuaternion(beam.quaternion);
-
-            return {
-                faceType: faceType,
-                center: worldCenter,
-                normal: worldNormal
-            };
-        }
-
-        // ----- Animation Loop -----
         function animate() {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
         }
         animate();
 
-        // ----- Handle Window Resize -----
         window.addEventListener("resize", function () {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
