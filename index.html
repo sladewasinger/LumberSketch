@@ -136,6 +136,8 @@
 
         // ----- Event Listeners for Drawing a Beam -----
         renderer.domElement.addEventListener("pointerdown", function (event) {
+            if (event.button !== 0) return; // Only respond to left mouse button.
+
             // Check if we are clicking on an existing beam.
             pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
             pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
@@ -171,29 +173,31 @@
                 // Only create a beam if the length is significant
                 if (distance > 0.1) {
                     // ----- Create the Beam -----
-                    // For a typical 2x4 the actual cross section is about 1.5" x 3.5".
-                    // Here we use these numbers as our cross-sectional dimensions.
+                    // For a typical 2x4, the cross-section is about 1.5" x 3.5"
                     const beamHeight = 1.5;
                     const beamDepth = 3.5;
-                    // We create a box whose width equals the distance (assumed along the X-axis)
+                    // Create a box whose width equals the distance.
                     const geometry = new THREE.BoxGeometry(distance, beamHeight, beamDepth);
-                    const material = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // wood color
+                    // Translate the geometry so that its local origin lies at the left (start) end.
+                    geometry.translate(distance / 2, 0, 0);
+                    const material = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
                     const beam = new THREE.Mesh(geometry, material);
 
-                    // Position the beam at the midpoint between start and end
-                    const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
-                    beam.position.copy(midPoint);
+                    // Position the beam so that its left end is at startPoint.
+                    beam.position.copy(startPoint);
 
-                    // Rotate the beam so that its long axis aligns with the drawn direction.
+                    // Compute the direction from startPoint to endPoint.
                     const direction = new THREE.Vector3().subVectors(endPoint, startPoint).normalize();
-                    // Assuming the beam lies in the horizontal (x-z) plane, calculate the angle around Y.
-                    const angle = Math.atan2(direction.z, direction.x);
-                    beam.rotation.y = angle;
+                    // Create a quaternion that rotates the local X axis (1,0,0)
+                    // so it aligns with the computed direction.
+                    const quaternion = new THREE.Quaternion();
+                    quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction);
+                    beam.quaternion.copy(quaternion);
 
-                    // Add the beam to our scene and update drag controls.
+                    // Add the beam to the scene.
                     beamsGroup.add(beam);
                 }
-                // Clean up the preview and drawing state.
+                // Clean up the preview line and reset drawing state.
                 scene.remove(previewLine);
                 previewLine.geometry.dispose();
                 previewLine.material.dispose();
