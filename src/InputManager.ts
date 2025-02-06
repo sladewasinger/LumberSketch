@@ -96,16 +96,18 @@ export class InputManager {
     };
 
     private onKeyDown = (event: KeyboardEvent): void => {
-        if ((event.key.toLowerCase() === 'q' || event.key.toLocaleLowerCase() == "e") && this.selectedBeams.length > 0) {
+        const rotationKeysToAxis: Record<string, THREE.Vector3> = {
+            q: new THREE.Vector3(1, 0, 0), // Rotate around X-axis
+            e: new THREE.Vector3(0, 1, 0), // Rotate around Y-axis
+            r: new THREE.Vector3(0, 0, 1) // Rotate around Z-axis
+        }
+        const key = event.key.toLocaleLowerCase();
+        if (Object.keys(rotationKeysToAxis).includes(key) && this.selectedBeams.length > 0) {
             // Flip the dragged beam.
             console.log('Flipping beam');
 
             for (const beam of this.selectedBeams) {
-                const b = beam as Beam;
-                const rotationAxis = event.key.toLowerCase() === 'q'
-                    ? new THREE.Vector3(1, 0, 0) // Rotate around X-axis
-                    : new THREE.Vector3(0, 0, 1); // Rotate around Z-axis
-
+                const rotationAxis = rotationKeysToAxis[key];
                 beam.rotateOnAxis(rotationAxis, Math.PI / 2);
             }
         }
