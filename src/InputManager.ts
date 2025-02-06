@@ -96,6 +96,7 @@ export class InputManager {
     };
 
     private onKeyDown = (event: KeyboardEvent): void => {
+
         const rotationKeysToAxis: Record<string, THREE.Vector3> = {
             q: new THREE.Vector3(1, 0, 0), // Rotate around X-axis
             e: new THREE.Vector3(0, 1, 0), // Rotate around Y-axis
