@@ -129,7 +129,7 @@ export class InputManager {
             newPosition = this.handleSnapping(intersections[0].object as THREE.Mesh, event);
         } else {
             newPosition = this.getDefaultDragPosition(event);
-            this.activeSnapPlane = null;
+            // this.activeSnapPlane = null;
         }
 
         this.currentDraggedBeam.position.copy(newPosition);
