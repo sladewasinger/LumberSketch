@@ -41,6 +41,25 @@ export function getPlaneIntersection(
     return intersection;
 }
 
+export function getLocalFaceCenter(faceType: string, length: number, height: number, depth: number): THREE.Vector3 {
+    switch (faceType) {
+        case 'left':
+            return new THREE.Vector3(0, 0, 0);
+        case 'right':
+            return new THREE.Vector3(length, 0, 0);
+        case 'top':
+            return new THREE.Vector3(length / 2, height / 2, 0);
+        case 'bottom':
+            return new THREE.Vector3(length / 2, -height / 2, 0);
+        case 'front':
+            return new THREE.Vector3(length / 2, 0, depth / 2);
+        case 'back':
+            return new THREE.Vector3(length / 2, 0, -depth / 2);
+        default:
+            return new THREE.Vector3();
+    }
+}
+
 export function getBeamFaceCenters(beam: THREE.Mesh): FaceData[] {
     const length = beam.userData.length as number;
     const height = beam.userData.height as number;
@@ -55,14 +74,12 @@ export function getBeamFaceCenters(beam: THREE.Mesh): FaceData[] {
         { faceType: 'back', pos: new THREE.Vector3(length / 2, 0, -depth / 2), normal: new THREE.Vector3(0, 0, -1) },
     ];
 
-    const faces: FaceData[] = [];
-    localFaces.forEach((face) => {
-        const center = face.pos.clone();
-        beam.localToWorld(center);
-        const normal = face.normal.clone().applyQuaternion(beam.quaternion);
-        faces.push({ faceType: face.faceType, center, normal });
+    return localFaces.map(face => {
+        const worldCenter = face.pos.clone();
+        beam.localToWorld(worldCenter);
+        const worldNormal = face.normal.clone().applyQuaternion(beam.quaternion);
+        return { faceType: face.faceType, center: worldCenter, normal: worldNormal };
     });
-    return faces;
 }
 
 export function getFaceUnderCursor(
