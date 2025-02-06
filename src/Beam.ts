@@ -36,4 +36,12 @@ export class Beam extends THREE.Mesh {
         outlineMesh.raycast = () => [];
         this.add(outlineMesh);
     }
+
+    public set isSelected(value: boolean) {
+        if (value) {
+            this.material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8, transparent: true, opacity: 0.5 }); // 0x8B4513
+        } else {
+            this.material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8 }); // 0x8B4513
+        }
+    }
 }
