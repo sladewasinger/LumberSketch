@@ -26,11 +26,14 @@ jobs:
         run: |
           npm install
           npm run build
+          mkdir deploy
+          cp -R ./dist ./deploy
+          cp index.html ./deploy/index.html
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3.0.1
         with:
-          path: ./dist
+          path: ./deploy
 
       - name: Deploy GitHub Pages site
         uses: actions/deploy-pages@v4.0.5
