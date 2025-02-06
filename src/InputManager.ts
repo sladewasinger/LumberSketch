@@ -37,6 +37,9 @@ export class InputManager {
     private drawStartPoint: THREE.Vector3 = new THREE.Vector3();
     private previewLine: THREE.Line | null = null;
 
+    // Minimum length of a beam
+    private minBeamLength: number = 1;
+
     constructor(
         scene: THREE.Scene,
         camera: THREE.PerspectiveCamera,
@@ -106,13 +109,20 @@ export class InputManager {
     /** Initializes dragging when a beam is clicked */
     private startDraggingBeam(beam: THREE.Mesh, event: PointerEvent): void {
         this.currentDraggedBeam = beam;
-        this.defaultDragPlane.set(new THREE.Vector3(0, 1, 0), -beam.position.y + beam.userData.height / 2);
-        //this.defaultDragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
+        this.defaultDragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
         this.dragInitialIntersection = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.defaultDragPlane);
         this.dragOffset.copy(beam.position).sub(this.dragInitialIntersection);
 
-        if (this.activeSnapPlane) {
-            this.prevPointerPosOnPlane = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.activeSnapPlane);
+        const otherBeams = this.beamManager.getBeamsGroup().children.filter(child => child !== this.currentDraggedBeam);
+        const intersections = this.raycaster.intersectObjects(otherBeams, true);
+
+        if (intersections.length > 0) {
+            const hoveredBeam = intersections[0].object as THREE.Mesh;
+            const hoveredFace = getFaceUnderCursor(hoveredBeam, event, this.camera, this.raycaster);
+            if (hoveredFace) {
+                this.activeSnapPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(hoveredFace.normal.clone(), hoveredFace.center.clone());
+                this.prevPointerPosOnPlane = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.activeSnapPlane);
+            }
         }
 
         eventBus.emit('selectionChanged', [beam]);
@@ -133,6 +143,7 @@ export class InputManager {
             newPosition = this.handleSnapping(intersections[0].object as THREE.Mesh, event);
         } else {
             this.defaultDragPlane = this.groundPlane.clone();
+            this.activeSnapPlane = null;
             newPosition = this.getDefaultDragPosition(event);
         }
 
@@ -213,6 +224,7 @@ export class InputManager {
     private stopDraggingBeam(): void {
         this.currentDraggedBeam = null;
         this.prevPointerPosOnPlane = null;
+        this.activeSnapPlane = null;
     }
 
     /** Starts drawing a new beam */
@@ -261,7 +273,7 @@ export class InputManager {
             this.raycaster
         );
         const distance = this.drawStartPoint.distanceTo(endPoint);
-        if (distance > 0.1) {
+        if (distance >= this.minBeamLength) {
             // Create a new beam (example uses fixed height/depth values).
             const beamHeight = 1.5;
             const beamDepth = 3.5;
