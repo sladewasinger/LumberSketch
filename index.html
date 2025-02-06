@@ -30,9 +30,14 @@
 <body>
     <div id="canvas-container"></div>
     <div id="measurement"></div>
-    <!-- Three.js and OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/OutlinePass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/shaders/FXAAShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/ShaderPass.js"></script>
     <script>
         // ----- Scene Setup -----
         const scene = new THREE.Scene();
@@ -54,6 +59,10 @@
         const gridHelper = new THREE.GridHelper(100, 100);
         scene.add(gridHelper);
 
+        // ----- Group to hold beams -----
+        const beamsGroup = new THREE.Group();
+        scene.add(beamsGroup);
+
         // ----- Lighting -----
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
@@ -61,15 +70,43 @@
         directionalLight.position.set(50, 50, 50);
         scene.add(directionalLight);
 
+        // 1. Create an EffectComposer for post-processing.
+        const composer = new THREE.EffectComposer(renderer);
+
+        // 2. Create and add a RenderPass.
+        const renderPass = new THREE.RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        // 3. Create an OutlinePass.
+        // The OutlinePass constructor takes a Vector2 for the render size, the scene, and the camera.
+        const outlinePass = new THREE.OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera);
+
+        // Set outline parameters (adjust as needed).
+        outlinePass.edgeStrength = 3.0;
+        outlinePass.edgeGlow = 0.0;
+        outlinePass.edgeThickness = 1.0;
+        outlinePass.pulsePeriod = 0; // 0 means no pulsing
+        outlinePass.visibleEdgeColor.set('red'); // black outline
+        outlinePass.hiddenEdgeColor.set('red');  // also black
+
+        // You can choose which objects to outline by setting selectedObjects.
+        // For example, to outline all beams in beamsGroup:
+        outlinePass.selectedObjects = [];
+        composer.addPass(outlinePass);
+
+        // // 4. (Optional) Add an FXAA pass to smooth jagged edges.
+        // const effectFXAA = new THREE.ShaderPass(THREE.FXAAShader);
+        // effectFXAA.uniforms["resolution"].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+        // composer.addPass(effectFXAA);
+
+
         // ----- Ground Plane (for raycasting) -----
         const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
         // ----- Measurement Display -----
         const measurementDiv = document.getElementById("measurement");
 
-        // ----- Group to hold beams -----
-        const beamsGroup = new THREE.Group();
-        scene.add(beamsGroup);
+
 
         // --- Variables for Drag & Snapping ---
         let currentDraggedBeam = null; // The beam being dragged.
@@ -215,6 +252,30 @@
             return bestAxis;
         }
 
+        function getPlaneIntersection(clientX, clientY, plane) {
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const intersection = new THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, intersection);
+            return intersection;
+        }
+
+
+        function getDragIntersection(clientX, clientY) {
+            // Use the same pointer and raycaster as before.
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            // Create a plane parallel to the ground but at the dragged beam’s initial y value.
+            // The plane's constant is -dragInitialBeamPos.y.
+            const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -dragInitialBeamPos.y);
+            const intersection = new THREE.Vector3();
+            raycaster.ray.intersectPlane(dragPlane, intersection);
+            return intersection;
+        }
+
+
         // Keydown: Cycle active snap face for dragged beam.
         window.addEventListener("keydown", function (event) {
             if (event.key.toLowerCase() === 'f' && currentDraggedBeam) {
@@ -224,6 +285,9 @@
         });
 
         // ----- Custom Drag & Drawing Handlers -----
+        // Global variable (add near your other globals)
+        let dragPlane = new THREE.Plane();  // Will be set at pointerdown.
+
         window.addEventListener("pointerdown", function (event) {
             if (event.button !== 0) return;
             pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -233,11 +297,15 @@
             if (intersects.length > 0) {
                 currentDraggedBeam = intersects[0].object;
                 dragInitialBeamPos.copy(currentDraggedBeam.position);
+                // Create a drag plane parallel to the ground but passing through the beam's current position.
+                dragPlane.set(new THREE.Vector3(0, 1, 0), -currentDraggedBeam.position.y);
+                // Use the drag plane to compute the initial pointer intersection.
+                dragInitialPointer.copy(getPlaneIntersection(event.clientX, event.clientY, dragPlane));
                 // Store initial face data.
                 dragInitialFaceCenters = getBeamFaceCenters(currentDraggedBeam).map(face => {
                     return { faceType: face.faceType, center: face.center.clone(), normal: face.normal.clone() };
                 });
-                dragInitialPointer.copy(getGroundIntersection(event.clientX, event.clientY));
+                // (Optionally, update outlinePass.selectedObjects, etc.)
             } else {
                 isDrawing = true;
                 startPoint.copy(getGroundIntersection(event.clientX, event.clientY));
@@ -248,14 +316,16 @@
             }
         });
 
+
         window.addEventListener("pointermove", function (event) {
             lastMouseEvent = event;
             if (currentDraggedBeam) {
-                const currentPointer = getGroundIntersection(event.clientX, event.clientY);
+                // Use the drag plane (set at pointerdown) for current pointer intersection.
+                const currentPointer = getPlaneIntersection(event.clientX, event.clientY, dragPlane);
                 const delta = new THREE.Vector3().subVectors(currentPointer, dragInitialPointer);
                 const freeCandidate = new THREE.Vector3().addVectors(dragInitialBeamPos, delta);
 
-                // Temporarily remove dragged beam for raycasting.
+                // (The remainder of your raycasting for snapping remains the same.)
                 beamsGroup.remove(currentDraggedBeam);
                 pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
                 pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -271,10 +341,8 @@
 
                 let finalPos = freeCandidate.clone();
                 if (targetBeam && targetIntersection) {
-                    // Use getFaceUnderCursor to lock in the target face.
                     const targetFace = getFaceUnderCursor(targetBeam, event);
                     if (targetFace && targetFace.center) {
-                        // Instead of matching the same face, choose the dragged face that best aligns with the OPPOSITE of the target face's normal.
                         let bestCandidateFace = null;
                         let bestDot = -Infinity;
                         const oppositeNormal = targetFace.normal.clone().negate();
@@ -286,19 +354,15 @@
                             }
                         });
                         if (bestCandidateFace) {
-                            // Compute where the dragged beam’s candidate face would be if the beam were at freeCandidate.
                             const candidateDraggedFace = bestCandidateFace.center.clone().add(
                                 freeCandidate.clone().sub(dragInitialBeamPos)
                             );
-                            // Compute the difference vector between target face center and candidate dragged face.
                             const d = new THREE.Vector3().subVectors(targetFace.center, candidateDraggedFace);
-                            // Project this difference onto the target face’s normal.
                             const adjustment = targetFace.normal.clone().multiplyScalar(d.dot(targetFace.normal));
                             finalPos.add(adjustment);
                         }
                     }
                 }
-
                 currentDraggedBeam.position.copy(finalPos);
                 currentDraggedBeam.updateMatrixWorld();
             }
@@ -310,12 +374,14 @@
             }
         });
 
+
         window.addEventListener("pointerup", function (event) {
             if (currentDraggedBeam) {
                 currentDraggedBeam = null;
                 dragInitialBeamPos.set(0, 0, 0);
                 dragInitialFaceCenters = [];
                 dragInitialPointer.set(0, 0, 0);
+                outlinePass.selectedObjects = [];
             }
             if (isDrawing && previewLine) {
                 const endPoint = getGroundIntersection(event.clientX, event.clientY);
@@ -334,6 +400,18 @@
                     const quaternion = new THREE.Quaternion();
                     quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), snappedDir);
                     beam.quaternion.copy(quaternion);
+
+                    // Create an EdgesGeometry from the beam's geometry.
+                    const edges = new THREE.EdgesGeometry(beam.geometry);
+                    // Create a LineBasicMaterial with your desired outline color (black in your case).
+                    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+                    // Create the line segments that represent the edges.
+                    const outlineMesh = new THREE.LineSegments(edges, lineMaterial);
+                    // Disable raycasting so it won't be picked up by your drag controls.
+                    outlineMesh.raycast = () => [];
+                    // Add the outline as a child of the beam.
+                    beam.add(outlineMesh);
+
                     beamsGroup.add(beam);
                 }
                 scene.remove(previewLine);
@@ -347,14 +425,17 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+            //renderer.render(scene, camera);
+            composer.render();
         }
         animate();
 
         window.addEventListener("resize", function () {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
+            outlinePass.setSize(window.innerWidth, window.innerHeight);
             renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
         }, false);
     </script>
 </body>
