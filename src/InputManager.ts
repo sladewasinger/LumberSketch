@@ -109,8 +109,12 @@ export class InputManager {
     /** Initializes dragging when a beam is clicked */
     private startDraggingBeam(beam: THREE.Mesh, event: PointerEvent): void {
         this.currentDraggedBeam = beam;
-        this.defaultDragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
-        this.dragInitialIntersection = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.defaultDragPlane);
+        //this.defaultDragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
+        this.defaultDragPlane = this.groundPlane; //this.groundPlane.clone().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
+        this.dragInitialIntersection = getGroundIntersection(event.clientX, event.clientY, this.camera, this.raycaster).add(new THREE.Vector3(0, beam.userData.height / 2, 0));
+        //this.dragInitialIntersection =  getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.defaultDragPlane);
+        // calculate dragOffset from same plane as defaultDragPlane
+
         this.dragOffset.copy(beam.position).sub(this.dragInitialIntersection);
 
         const otherBeams = this.beamManager.getBeamsGroup().children.filter(child => child !== this.currentDraggedBeam);
@@ -144,7 +148,7 @@ export class InputManager {
         } else {
             this.defaultDragPlane = this.groundPlane.clone();
             this.activeSnapPlane = null;
-            newPosition = this.getDefaultDragPosition(event);
+            newPosition = this.getDefaultDragPosition(event, this.currentDraggedBeam);
         }
 
         this.currentDraggedBeam.position.copy(newPosition);
@@ -156,7 +160,7 @@ export class InputManager {
         if (!this.currentDraggedBeam) return hoveredBeam.position.clone();
 
         const hoveredFace = getFaceUnderCursor(hoveredBeam, event, this.camera, this.raycaster);
-        if (!hoveredFace) return this.getDefaultDragPosition(event);
+        if (!hoveredFace) return this.getDefaultDragPosition(event, this.currentDraggedBeam);
 
         let activeDragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(hoveredFace.normal.clone(), hoveredFace.center.clone());
         let shouldUpdateSnapPos = true;
@@ -189,8 +193,14 @@ export class InputManager {
     }
 
     /** Returns the default drag position when no snapping occurs */
-    private getDefaultDragPosition(event: PointerEvent): THREE.Vector3 {
-        const intersection = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.defaultDragPlane);
+    private getDefaultDragPosition(event: PointerEvent, beam: THREE.Mesh): THREE.Vector3 {
+        const intersection = getGroundIntersection(
+            event.clientX,
+            event.clientY,
+            this.camera,
+            this.raycaster
+        ).add(new THREE.Vector3(0, 1.5 / 2, 0));
+        //const intersection = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.groundPlane);
         return intersection.clone().add(this.dragOffset);
     }
 
@@ -235,7 +245,7 @@ export class InputManager {
             event.clientY,
             this.camera,
             this.raycaster
-        );
+        ).add(new THREE.Vector3(0, 1.5 / 2, 0));
         // Create a preview line.
         const geometry = new THREE.BufferGeometry().setFromPoints([this.drawStartPoint, this.drawStartPoint.clone()]);
         const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
@@ -278,7 +288,7 @@ export class InputManager {
             const beamHeight = 1.5;
             const beamDepth = 3.5;
             const beam = new Beam({ length: distance, height: beamHeight, depth: beamDepth });
-            beam.position.copy(this.drawStartPoint).add(new THREE.Vector3(0, beamHeight / 2, 0));
+            beam.position.copy(this.drawStartPoint);
             // Optionally snap the beam’s direction to a cardinal axis.
             const direction = new THREE.Vector3().subVectors(endPoint, this.drawStartPoint).normalize();
             const snappedDir = snapDirection(direction);
