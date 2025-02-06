@@ -44,17 +44,17 @@ export function getPlaneIntersection(
 export function getLocalFaceCenter(faceType: string, length: number, height: number, depth: number): THREE.Vector3 {
     switch (faceType) {
         case 'left':
-            return new THREE.Vector3(0, 0, 0);
+            return new THREE.Vector3(-length / 2, 0, 0);
         case 'right':
-            return new THREE.Vector3(length, 0, 0);
+            return new THREE.Vector3(length / 2, 0, 0);
         case 'top':
-            return new THREE.Vector3(length / 2, height / 2, 0);
+            return new THREE.Vector3(0, height / 2, 0);
         case 'bottom':
-            return new THREE.Vector3(length / 2, -height / 2, 0);
+            return new THREE.Vector3(0, -height / 2, 0);
         case 'front':
-            return new THREE.Vector3(length / 2, 0, depth / 2);
+            return new THREE.Vector3(0, 0, depth / 2);
         case 'back':
-            return new THREE.Vector3(length / 2, 0, -depth / 2);
+            return new THREE.Vector3(0, 0, -depth / 2);
         default:
             return new THREE.Vector3();
     }
@@ -66,12 +66,12 @@ export function getBeamFaceCenters(beam: THREE.Mesh): FaceData[] {
     const depth = beam.userData.depth as number;
 
     const localFaces: { faceType: string; pos: THREE.Vector3; normal: THREE.Vector3 }[] = [
-        { faceType: 'left', pos: new THREE.Vector3(0, 0, 0), normal: new THREE.Vector3(-1, 0, 0) },
-        { faceType: 'right', pos: new THREE.Vector3(length, 0, 0), normal: new THREE.Vector3(1, 0, 0) },
-        { faceType: 'top', pos: new THREE.Vector3(length / 2, height / 2, 0), normal: new THREE.Vector3(0, 1, 0) },
-        { faceType: 'bottom', pos: new THREE.Vector3(length / 2, -height / 2, 0), normal: new THREE.Vector3(0, -1, 0) },
-        { faceType: 'front', pos: new THREE.Vector3(length / 2, 0, depth / 2), normal: new THREE.Vector3(0, 0, 1) },
-        { faceType: 'back', pos: new THREE.Vector3(length / 2, 0, -depth / 2), normal: new THREE.Vector3(0, 0, -1) },
+        { faceType: 'left', pos: new THREE.Vector3(-length / 2, 0, 0), normal: new THREE.Vector3(-1, 0, 0) },
+        { faceType: 'right', pos: new THREE.Vector3(length / 2, 0, 0), normal: new THREE.Vector3(1, 0, 0) },
+        { faceType: 'top', pos: new THREE.Vector3(0, height / 2, 0), normal: new THREE.Vector3(0, 1, 0) },
+        { faceType: 'bottom', pos: new THREE.Vector3(0, -height / 2, 0), normal: new THREE.Vector3(0, -1, 0) },
+        { faceType: 'front', pos: new THREE.Vector3(0, 0, depth / 2), normal: new THREE.Vector3(0, 0, 1) },
+        { faceType: 'back', pos: new THREE.Vector3(0, 0, -depth / 2), normal: new THREE.Vector3(0, 0, -1) },
     ];
 
     return localFaces.map(face => {
@@ -108,7 +108,7 @@ export function getFaceUnderCursor(
             switch (face.faceType) {
                 case 'left':
                     if (
-                        Math.abs(localIntersection.x) < 0.01 &&
+                        Math.abs(localIntersection.x + length / 2) < 0.01 &&
                         localIntersection.y >= -height / 2 &&
                         localIntersection.y <= height / 2 &&
                         localIntersection.z >= -depth / 2 &&
@@ -118,7 +118,7 @@ export function getFaceUnderCursor(
                     break;
                 case 'right':
                     if (
-                        Math.abs(localIntersection.x - length) < 0.01 &&
+                        Math.abs(localIntersection.x - length / 2) < 0.01 &&
                         localIntersection.y >= -height / 2 &&
                         localIntersection.y <= height / 2 &&
                         localIntersection.z >= -depth / 2 &&
@@ -129,8 +129,8 @@ export function getFaceUnderCursor(
                 case 'top':
                     if (
                         Math.abs(localIntersection.y - height / 2) < 0.01 &&
-                        localIntersection.x >= 0 &&
-                        localIntersection.x <= length &&
+                        localIntersection.x >= -length / 2 &&
+                        localIntersection.x <= length / 2 &&
                         localIntersection.z >= -depth / 2 &&
                         localIntersection.z <= depth / 2
                     )
@@ -139,8 +139,8 @@ export function getFaceUnderCursor(
                 case 'bottom':
                     if (
                         Math.abs(localIntersection.y + height / 2) < 0.01 &&
-                        localIntersection.x >= 0 &&
-                        localIntersection.x <= length &&
+                        localIntersection.x >= -length / 2 &&
+                        localIntersection.x <= length / 2 &&
                         localIntersection.z >= -depth / 2 &&
                         localIntersection.z <= depth / 2
                     )
@@ -149,8 +149,8 @@ export function getFaceUnderCursor(
                 case 'front':
                     if (
                         Math.abs(localIntersection.z - depth / 2) < 0.01 &&
-                        localIntersection.x >= 0 &&
-                        localIntersection.x <= length &&
+                        localIntersection.x >= -length / 2 &&
+                        localIntersection.x <= length / 2 &&
                         localIntersection.y >= -height / 2 &&
                         localIntersection.y <= height / 2
                     )
@@ -159,8 +159,8 @@ export function getFaceUnderCursor(
                 case 'back':
                     if (
                         Math.abs(localIntersection.z + depth / 2) < 0.01 &&
-                        localIntersection.x >= 0 &&
-                        localIntersection.x <= length &&
+                        localIntersection.x >= -length / 2 &&
+                        localIntersection.x <= length / 2 &&
                         localIntersection.y >= -height / 2 &&
                         localIntersection.y <= height / 2
                     )

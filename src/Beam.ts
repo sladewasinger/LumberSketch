@@ -17,12 +17,15 @@ export class Beam extends THREE.Mesh {
             dimensions.height,
             dimensions.depth
         );
-        geometry.translate(dimensions.length / 2, 0, 0);
+        //geometry.translate(dimensions.length / 2, 0, 0);
+
 
         if (!material) {
             material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8 }); // 0x8B4513
         }
         super(geometry, material);
+
+        //this.position.set(dimensions.length / 2, 0, 0);
 
         this.dimensions = dimensions;
         // Also store the dimensions in userData (used later by some utilities)

@@ -21,12 +21,8 @@ export class InputManager {
     private measurementDisplay: MeasurementDisplay;
     private raycaster: THREE.Raycaster;
 
-    // Ground Plane:
-    private groundPlane: THREE.Plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
     // Drag state
     private currentDraggedBeam: THREE.Mesh | null = null;
-    private defaultDragPlane: THREE.Plane = new THREE.Plane();
     private dragInitialIntersection: THREE.Vector3 = new THREE.Vector3();
     private dragOffset: THREE.Vector3 = new THREE.Vector3();
     private prevPointerPosOnPlane: THREE.Vector3 | null = null;
@@ -39,6 +35,7 @@ export class InputManager {
 
     // Minimum length of a beam
     private minBeamLength: number = 1;
+    private selectedBeams: THREE.Mesh[] = [];
 
     constructor(
         scene: THREE.Scene,
@@ -67,9 +64,15 @@ export class InputManager {
         // Check if a beam was clicked
         const intersects = this.raycaster.intersectObjects(this.beamManager.getBeamsGroup().children, true);
         if (intersects.length > 0) {
-            this.startDraggingBeam(intersects[0].object as THREE.Mesh, event);
-        } else {
+            const beam = intersects[0].object as THREE.Mesh;
+            this.selectedBeams = [beam];
+            eventBus.emit('selectionChanged', this.selectedBeams);
+            this.startDraggingBeam(beam, event);
+        } else if (this.selectedBeams.length == 0) {
             this.startDrawingBeam(event);
+        } else {
+            this.selectedBeams = [];
+            eventBus.emit('selectionChanged', this.selectedBeams);
         }
     };
 
@@ -93,8 +96,18 @@ export class InputManager {
     };
 
     private onKeyDown = (event: KeyboardEvent): void => {
-        if (event.key.toLowerCase() === 'f' && this.currentDraggedBeam) {
-            eventBus.emit('selectionChanged', [this.currentDraggedBeam]);
+        if ((event.key.toLowerCase() === 'q' || event.key.toLocaleLowerCase() == "e") && this.selectedBeams.length > 0) {
+            // Flip the dragged beam.
+            console.log('Flipping beam');
+
+            for (const beam of this.selectedBeams) {
+                const b = beam as Beam;
+                const rotationAxis = event.key.toLowerCase() === 'q'
+                    ? new THREE.Vector3(1, 0, 0) // Rotate around X-axis
+                    : new THREE.Vector3(0, 0, 1); // Rotate around Z-axis
+
+                beam.rotateOnAxis(rotationAxis, Math.PI / 2);
+            }
         }
     };
 
@@ -110,7 +123,6 @@ export class InputManager {
     private startDraggingBeam(beam: THREE.Mesh, event: PointerEvent): void {
         this.currentDraggedBeam = beam;
         //this.defaultDragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
-        this.defaultDragPlane = this.groundPlane; //this.groundPlane.clone().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), beam.position.clone().add(new THREE.Vector3(0, beam.userData.height / 2, 0)));
         this.dragInitialIntersection = getGroundIntersection(event.clientX, event.clientY, this.camera, this.raycaster).add(new THREE.Vector3(0, beam.userData.height / 2, 0));
         //this.dragInitialIntersection =  getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.defaultDragPlane);
         // calculate dragOffset from same plane as defaultDragPlane
@@ -128,8 +140,6 @@ export class InputManager {
                 this.prevPointerPosOnPlane = getPlaneIntersection(event.clientX, event.clientY, this.camera, this.raycaster, this.activeSnapPlane);
             }
         }
-
-        eventBus.emit('selectionChanged', [beam]);
     }
 
     /** Updates dragged beam position based on the mouse movement */
@@ -146,7 +156,6 @@ export class InputManager {
         if (intersections.length > 0) {
             newPosition = this.handleSnapping(intersections[0].object as THREE.Mesh, event);
         } else {
-            this.defaultDragPlane = this.groundPlane.clone();
             this.activeSnapPlane = null;
             newPosition = this.getDefaultDragPosition(event, this.currentDraggedBeam);
         }
