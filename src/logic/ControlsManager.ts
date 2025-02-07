@@ -7,9 +7,8 @@ export class ControlsManager {
 
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
         this.controls = new OrbitControls(camera, domElement);
-        // (Customize the mouse button mapping if desired)
         this.controls.mouseButtons = { MIDDLE: THREE.MOUSE.PAN };
-
+        this.controls.touches = { ONE: null, TWO: THREE.TOUCH.PAN };
     }
 
     public update(): void {

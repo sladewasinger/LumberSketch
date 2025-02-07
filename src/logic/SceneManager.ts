@@ -1,6 +1,8 @@
 // src/SceneManager.ts
 import * as THREE from 'three';
-import { MeshLine, MeshLineMaterial } from './packages/three.meshline/THREE.MeshLine';
+import { MeshLine, MeshLineMaterial } from '../packages/three.meshline/THREE.MeshLine';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 
 export class CustomAxes extends THREE.Group {
     constructor(axisLength = 100, lineWidth: number = 1) {
@@ -52,8 +54,7 @@ export class SceneManager {
 
         // Create Renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
-
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.onWindowResize();
         this.container.appendChild(this.renderer.domElement);
 
         // Add Grid Helper

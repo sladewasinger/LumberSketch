@@ -1,10 +1,11 @@
 // src/index.ts
-import { SceneManager } from './SceneManager';
-import { ControlsManager } from './ControlsManager';
-import { PostProcessingManager } from './PostProcessingManager';
-import { BeamManager } from './BeamManager';
-import { MeasurementDisplay } from './MeasurementDisplay';
-import { InputManager } from './InputManager';
+import { SceneManager } from './logic/SceneManager';
+import { ControlsManager } from './logic/ControlsManager';
+import { PostProcessingManager } from './logic/PostProcessingManager';
+import { BeamManager } from './logic/BeamManager';
+import { MeasurementDisplay } from './logic/MeasurementDisplay';
+import { InputManager } from './logic/InputManager';
+import { CursorProjection } from './logic/CursorProjection';
 
 function init(): void {
     const container = document.getElementById('canvas-container');
@@ -36,11 +37,19 @@ function init(): void {
         measurementDisplay
     );
 
+    const cursorProjection = new CursorProjection(
+        sceneManager.scene,
+        sceneManager.camera,
+        sceneManager.renderer,
+        beamManager
+    );
+
     // Animation loop
     function animate(): void {
         requestAnimationFrame(animate);
         controlsManager.update();
         postProcessingManager.render();
+        cursorProjection.update();
     }
     animate();
 

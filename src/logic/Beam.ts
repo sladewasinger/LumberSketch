@@ -17,34 +17,39 @@ export class Beam extends THREE.Mesh {
             dimensions.height,
             dimensions.depth
         );
-        //geometry.translate(dimensions.length / 2, 0, 0);
-
 
         if (!material) {
-            material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8 }); // 0x8B4513
+            material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8, transparent: true }); // 0x8B4513
         }
+
         super(geometry, material);
-
-        //this.position.set(dimensions.length / 2, 0, 0);
-
         this.dimensions = dimensions;
-        // Also store the dimensions in userData (used later by some utilities)
         this.userData = { ...dimensions };
 
-        // Add an outline mesh to show edges.
         const edges = new THREE.EdgesGeometry(geometry);
         const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 3 });
         const outlineMesh = new THREE.LineSegments(edges, lineMaterial);
-        // Disable raycasting on the outline mesh.
+        // Disable raycasting on the outline mesh to avoid click and drag
         outlineMesh.raycast = () => [];
         this.add(outlineMesh);
     }
 
     public set isSelected(value: boolean) {
         if (value) {
-            this.material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8, transparent: true, opacity: 0.5 }); // 0x8B4513
+            this.setOpacity(0.5);
         } else {
-            this.material = new THREE.MeshLambertMaterial({ color: 0xedc487, polygonOffset: true, polygonOffsetFactor: 0.8 }); // 0x8B4513
+            this.setOpacity(1);
         }
+    }
+
+    public setOpacity(value: number) {
+        if (this.material instanceof THREE.MeshLambertMaterial) {
+            this.material.opacity = value;
+            this.material.needsUpdate = true;
+        }
+    }
+
+    public getLeftBottomCorner(): THREE.Vector3 {
+        return new THREE.Vector3(-this.dimensions.length / 2, -this.dimensions.height / 2, -this.dimensions.depth / 2);
     }
 }

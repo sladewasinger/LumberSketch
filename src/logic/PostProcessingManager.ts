@@ -5,7 +5,8 @@ import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectionShader.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { eventBus } from './EventBus';
+import { eventBus } from '../events/EventBus';
+import { EVENT_BEAMS_DESELECTED, EVENT_BEAMS_SELECTED } from '../events/Constants';
 
 export class PostProcessingManager {
     public composer: EffectComposer;
@@ -38,9 +39,14 @@ export class PostProcessingManager {
         this.composer.addPass(effectFXAA)
         this.composer.addPass(gammaCorrection);
 
+        this.onWindowResize();
+
         // Listen for selection events:
-        eventBus.on('selectionChanged', (selectedObjects: THREE.Object3D[]) => {
+        eventBus.on(EVENT_BEAMS_SELECTED, (selectedObjects: THREE.Object3D[]) => {
             outlinePass.selectedObjects = selectedObjects;
+        });
+        eventBus.on(EVENT_BEAMS_DESELECTED, () => {
+            outlinePass.selectedObjects = [];
         });
     }
 

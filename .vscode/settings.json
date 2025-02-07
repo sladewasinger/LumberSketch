@@ -1,0 +1,11 @@
+{
+    "vscode-neovim.compositeKeys": {
+        "jj": {
+            "command": "vscode-neovim.escape",
+        },
+        "kj": {
+            "command": "vscode-neovim.escape",
+        }
+    },
+    "files.autoSave": "onFocusChange",
+}

@@ -7,6 +7,18 @@ export interface FaceData {
     normal: THREE.Vector3;
 }
 
+export function roundToNearest3D(value: THREE.Vector3, step: number): THREE.Vector3 {
+    return new THREE.Vector3(
+        roundToNearest(value.x, step),
+        roundToNearest(value.y, step),
+        roundToNearest(value.z, step)
+    );
+}
+
+export function roundToNearest(value: number, step: number): number {
+    return Math.round(value / step) * step;
+}
+
 export function getGroundIntersection(
     clientX: number,
     clientY: number,
