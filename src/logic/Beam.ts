@@ -27,9 +27,9 @@ export class Beam extends THREE.Mesh {
         this.userData = { ...dimensions };
 
         const edges = new THREE.EdgesGeometry(geometry);
-        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 3 });
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2, transparent: true, opacity: 0.7 });
         const outlineMesh = new THREE.LineSegments(edges, lineMaterial);
-        // Disable raycasting on the outline mesh to avoid click and drag
+        // Disable raycasting on the outline mesh to avoid click and drag:
         outlineMesh.raycast = () => [];
         this.add(outlineMesh);
     }
@@ -51,5 +51,10 @@ export class Beam extends THREE.Mesh {
 
     public getLeftBottomCorner(): THREE.Vector3 {
         return new THREE.Vector3(-this.dimensions.length / 2, -this.dimensions.height / 2, -this.dimensions.depth / 2);
+    }
+
+    public clone(recursive?: boolean): this {
+        return new Beam(this.dimensions, this.material as THREE.Material)
+            .copy(this, recursive) as this;
     }
 }

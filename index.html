@@ -33,17 +33,59 @@
             font-family: sans-serif;
             padding: 5px;
             background: rgba(0, 0, 0, 0.8);
+        }
 
-            & .x-label {
-                color: #ff0000;
-            }
+        #axes-labels .x-label {
+            color: #ff0000;
+        }
 
-            & .y-label {
-                color: #00ff00;
-            }
+        #axes-labels .y-label {
+            color: #00ff00;
+        }
 
-            & .z-label {
-                color: #4477ff;
+        #axes-labels .z-label {
+            color: #4477ff;
+        }
+
+        .mode-buttons {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 25px;
+
+            .mode-button {
+                background: #333;
+                color: white;
+                border: none;
+                padding: 10px;
+                margin: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                border-radius: 5px;
+                position: relative;
+
+                .tooltip {
+                    position: absolute;
+                    top: -10px;
+                    left: -10px;
+                    background: black;
+                    color: white;
+                    font-size: 12px;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    pointer-events: none;
+                }
+
+                .mode-button:hover {
+                    background: #555;
+                }
+
+                .mode-button:active {
+                    background: #777;
+                }
             }
         }
     </style>
@@ -56,6 +98,21 @@
         <div class="x-label">X Axis</div>
         <div class="y-label">Y Axis</div>
         <div class="z-label">Z Axis</div>
+    </div>
+    <div id="mode-buttons" class="mode-buttons">
+        <button id="place-beam-btn" title="Place Beam" class="mode-button">
+            🪵
+            <span class="tooltip">1</span>
+        </button>
+        <button id="select-beam-btn" title="Select Beam" class="mode-button">
+            🫳
+            <span class="tooltip">2</span>
+        </button>
+        <button id="cut-beam-btn" title="Cut" class="mode-button">
+            🪚
+            <span class="tooltip">3</span>
+        </button>
+    </div>
     </div>
     <script src="dist/bundle.js"></script>
 </body>

@@ -1,0 +1,54 @@
+import { AppState } from "../logic/AppState";
+import { BeamManager } from "../logic/BeamManager";
+import { ControlsManager } from "../logic/ControlsManager";
+import { CursorProjection } from "../logic/CursorProjection";
+import { GuiManager } from "../logic/GuiManager";
+import { InputManager } from "../logic/InputModes/InputManager";
+import { PlaceBeamInputMode } from "../logic/InputModes/PlaceBeamInputMode";
+import { SelectBeamInputMode } from "../logic/InputModes/SelectBeamInputMode";
+import { MeasurementDisplay } from "../logic/MeasurementDisplay";
+import { PostProcessingManager } from "../logic/PostProcessingManager";
+import { SceneManager } from "../logic/SceneManager";
+
+export class DependencyContainer {
+    private static instance: DependencyContainer;
+
+    public sceneManager: SceneManager;
+    public controlsManager: ControlsManager;
+    public postProcessingManager: PostProcessingManager;
+    public beamManager: BeamManager;
+    public measurementDisplay: MeasurementDisplay;
+    public inputManager: InputManager;
+    public cursorProjection: CursorProjection;
+    public guiManager: GuiManager;
+
+    private constructor(container: HTMLElement, measurementDiv: HTMLElement) {
+        const appState = AppState.getInstance();
+
+        this.sceneManager = new SceneManager(container);
+        this.controlsManager = new ControlsManager(this.sceneManager.renderer.domElement);
+        this.postProcessingManager = new PostProcessingManager(
+            this.sceneManager.renderer
+        );
+        this.beamManager = new BeamManager();
+        this.measurementDisplay = new MeasurementDisplay(measurementDiv);
+        this.inputManager = new InputManager();
+        this.cursorProjection = new CursorProjection(
+            this.sceneManager.renderer,
+            this.beamManager
+        );
+        this.guiManager = new GuiManager();
+
+        this.inputManager.inputMode = new SelectBeamInputMode();
+    }
+
+    public static getInstance(container?: HTMLElement, measurementDiv?: HTMLElement): DependencyContainer {
+        if (!DependencyContainer.instance) {
+            if (!container || !measurementDiv) {
+                throw new Error("DependencyContainer must be initialized with container elements.");
+            }
+            DependencyContainer.instance = new DependencyContainer(container, measurementDiv);
+        }
+        return DependencyContainer.instance;
+    }
+}

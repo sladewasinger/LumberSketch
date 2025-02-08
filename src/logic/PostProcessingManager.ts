@@ -6,12 +6,17 @@ import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectio
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { eventBus } from '../events/EventBus';
-import { EVENT_BEAMS_DESELECTED, EVENT_BEAMS_SELECTED } from '../events/Constants';
+import { EVENT_BEAM_DESELECTED, EVENT_BEAM_SELECTED } from '../events/Constants';
+import { AppState } from './AppState';
 
 export class PostProcessingManager {
     public composer: EffectComposer;
 
-    constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    constructor(renderer: THREE.WebGLRenderer) {
+        const appState = AppState.getInstance();
+        const scene = appState.scene;
+        const camera = appState.camera;
+
         this.composer = new EffectComposer(renderer);
 
         const renderPass = new RenderPass(scene, camera);
@@ -42,10 +47,10 @@ export class PostProcessingManager {
         this.onWindowResize();
 
         // Listen for selection events:
-        eventBus.on(EVENT_BEAMS_SELECTED, (selectedObjects: THREE.Object3D[]) => {
-            outlinePass.selectedObjects = selectedObjects;
+        eventBus.on(EVENT_BEAM_SELECTED, (selectedObject: THREE.Object3D) => {
+            outlinePass.selectedObjects = [selectedObject];
         });
-        eventBus.on(EVENT_BEAMS_DESELECTED, () => {
+        eventBus.on(EVENT_BEAM_DESELECTED, () => {
             outlinePass.selectedObjects = [];
         });
     }

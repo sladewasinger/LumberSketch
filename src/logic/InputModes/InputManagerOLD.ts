@@ -1,8 +1,8 @@
 // src/InputManager.ts
 import * as THREE from 'three';
-import { Beam } from './Beam';
-import { BeamManager } from './BeamManager';
-import { MeasurementDisplay } from './MeasurementDisplay';
+import { Beam } from '../Beam';
+import { BeamManager } from '../BeamManager';
+import { MeasurementDisplay } from '../MeasurementDisplay';
 import {
     getPlaneIntersection,
     getFaceUnderCursor,
@@ -11,12 +11,12 @@ import {
     getLocalFaceCenter,
     roundToNearest,
     roundToNearest3D
-} from './Utils';
-import { eventBus } from '../events/EventBus';
-import { snapDirection } from './Utils';
-import { EVENT_BEAMS_DESELECTED, EVENT_BEAMS_SELECTED } from '../events/Constants';
+} from '../Utils';
+import { eventBus } from '../../events/EventBus';
+import { snapDirection } from '../Utils';
+import { EVENT_BEAMS_DESELECTED, EVENT_BEAMS_SELECTED } from '../../events/Constants';
 
-export class InputManager {
+export class InputManagerOLD {
     // Scene objects
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
@@ -63,6 +63,8 @@ export class InputManager {
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
     }
+
+
 
     private onPointerDown = (event: PointerEvent): void => {
         if (event.button !== 0) return; // Only handle left-click
@@ -206,7 +208,6 @@ export class InputManager {
         }
 
         if (!this.prevPointerIntersection) {
-            console.log('first move');
             this.prevPointerIntersection = this.curPointerIntersection.clone();
         }
 
