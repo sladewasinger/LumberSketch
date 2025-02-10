@@ -11,7 +11,6 @@ export class Beam extends THREE.Mesh {
     public dimensions: BeamDimensions;
 
     constructor(dimensions: BeamDimensions, material?: THREE.Material) {
-        // Create box geometry so that the beam’s local origin is at its left edge.
         const geometry = new THREE.BoxGeometry(
             dimensions.length,
             dimensions.height,
@@ -23,6 +22,7 @@ export class Beam extends THREE.Mesh {
         }
 
         super(geometry, material);
+
         this.dimensions = dimensions;
         this.userData = { ...dimensions };
 
@@ -32,6 +32,16 @@ export class Beam extends THREE.Mesh {
         // Disable raycasting on the outline mesh to avoid click and drag:
         outlineMesh.raycast = () => [];
         this.add(outlineMesh);
+
+        // const positionAttribute = this.geometry.getAttribute('position');
+        // const colors = [];
+        // const color = new THREE.Color('white');
+        // for (let i = 0; i < positionAttribute.count; i += 3) {
+        //     colors.push(color.r, color.g, color.b);
+        //     colors.push(color.r, color.g, color.b);
+        //     colors.push(color.r, color.g, color.b);
+        // }
+        // this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     }
 
     public set isSelected(value: boolean) {
@@ -61,5 +71,80 @@ export class Beam extends THREE.Mesh {
         newBeam.userData = { ...this.userData };
 
         return newBeam as this;
+    }
+
+    public removeHighlights() {
+        const highlight = this.getObjectByName('highlight');
+        if (highlight) {
+            this.remove(highlight);
+        }
+    }
+
+    public highlightFace(face: THREE.Face, color: THREE.Color) {
+        // Remove any existing highlight mesh.
+        const existing = this.getObjectByName('highlight');
+        if (existing) {
+            this.remove(existing);
+        }
+
+        // Retrieve the vertex positions from the beam’s geometry.
+        const positionAttribute = this.geometry.getAttribute('position');
+        const vA = new THREE.Vector3().fromBufferAttribute(positionAttribute, face.a);
+        const vB = new THREE.Vector3().fromBufferAttribute(positionAttribute, face.b);
+        const vC = new THREE.Vector3().fromBufferAttribute(positionAttribute, face.c);
+
+        // Offset the vertices slightly along the face normal to avoid z-fighting.
+        const normalOffset = face.normal.clone().multiplyScalar(0.01);
+        vA.add(normalOffset);
+        vB.add(normalOffset);
+        vC.add(normalOffset);
+
+        // Create a geometry for the highlighted face that accurately covers the entire rectangular face.
+        const dimensions = this.dimensions;
+        const normal = face.normal;
+        let v1: THREE.Vector3, v2: THREE.Vector3, v3: THREE.Vector3, v4: THREE.Vector3;
+        if (Math.abs(normal.x) >= Math.abs(normal.y) && Math.abs(normal.x) >= Math.abs(normal.z)) {
+            const sign = Math.sign(normal.x);
+            v1 = new THREE.Vector3(sign * dimensions.length / 2, -dimensions.height / 2, -dimensions.depth / 2);
+            v2 = new THREE.Vector3(sign * dimensions.length / 2, dimensions.height / 2, -dimensions.depth / 2);
+            v3 = new THREE.Vector3(sign * dimensions.length / 2, dimensions.height / 2, dimensions.depth / 2);
+            v4 = new THREE.Vector3(sign * dimensions.length / 2, -dimensions.height / 2, dimensions.depth / 2);
+        } else if (Math.abs(normal.y) >= Math.abs(normal.x) && Math.abs(normal.y) >= Math.abs(normal.z)) {
+            const sign = Math.sign(normal.y);
+            v1 = new THREE.Vector3(-dimensions.length / 2, sign * dimensions.height / 2, -dimensions.depth / 2);
+            v2 = new THREE.Vector3(dimensions.length / 2, sign * dimensions.height / 2, -dimensions.depth / 2);
+            v3 = new THREE.Vector3(dimensions.length / 2, sign * dimensions.height / 2, dimensions.depth / 2);
+            v4 = new THREE.Vector3(-dimensions.length / 2, sign * dimensions.height / 2, dimensions.depth / 2);
+        } else {
+            const sign = Math.sign(normal.z);
+            v1 = new THREE.Vector3(-dimensions.length / 2, -dimensions.height / 2, sign * dimensions.depth / 2);
+            v2 = new THREE.Vector3(dimensions.length / 2, -dimensions.height / 2, sign * dimensions.depth / 2);
+            v3 = new THREE.Vector3(dimensions.length / 2, dimensions.height / 2, sign * dimensions.depth / 2);
+            v4 = new THREE.Vector3(-dimensions.length / 2, dimensions.height / 2, sign * dimensions.depth / 2);
+        }
+        const highlightGeometry = new THREE.BufferGeometry();
+        const vertices = new Float32Array([
+            v1.x, v1.y, v1.z,
+            v2.x, v2.y, v2.z,
+            v3.x, v3.y, v3.z,
+            v1.x, v1.y, v1.z,
+            v3.x, v3.y, v3.z,
+            v4.x, v4.y, v4.z,
+        ]);
+        highlightGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        highlightGeometry.setIndex([0, 1, 2, 3, 4, 5]);
+
+        // Create a basic material with the given color.
+        const highlightMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.7
+        });
+
+        // Create the highlight mesh and add it to the beam.
+        const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+        highlightMesh.name = 'highlight';
+        this.add(highlightMesh);
     }
 }

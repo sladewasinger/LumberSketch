@@ -13,6 +13,8 @@ export class SelectBeamInputMode extends InputMode {
     prevMouseIntersection: THREE.Vector3 | null = null;
     curMouseIntersection: THREE.Vector3 | null = null;
     orientation: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
+    hoveredBeam: Beam | null = null;
+    hoveredBeamFace: THREE.Face | null = null;
 
     constructor(private beamManager: BeamManager) {
         super();
@@ -23,6 +25,17 @@ export class SelectBeamInputMode extends InputMode {
     onMouseDown(event: MouseEvent): void {
         if (event.button !== 0) return;
         this.mouse1Down = true;
+
+        if (this.appState.keysDown.has('f')) {
+            if (this.hoveredBeam && this.hoveredBeamFace) {
+                const down = new THREE.Vector3(0, -1, 0);
+                const faceNormalWorld = this.hoveredBeamFace.normal.clone().applyQuaternion(this.hoveredBeam.quaternion);
+                const adjustmentQuat = new THREE.Quaternion().setFromUnitVectors(faceNormalWorld, down);
+                this.hoveredBeam.quaternion.premultiply(adjustmentQuat);
+                this.appState.selectedBeam = this.hoveredBeam;
+            }
+            return;
+        }
 
         const rayCaster = new THREE.Raycaster();
         rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
@@ -47,6 +60,26 @@ export class SelectBeamInputMode extends InputMode {
     }
 
     onMouseMove(event: MouseEvent): void {
+        this.beamManager.getBeams().forEach(x => x.removeHighlights());
+
+        if (this.appState.keysDown.has('f')) {
+            const rayCaster = new THREE.Raycaster();
+            rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
+            const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
+
+            if (intersects.length > 0 && intersects[0].face) {
+                const beam = intersects[0].object as Beam;
+                beam.highlightFace(intersects[0].face, new THREE.Color(0x00ff00));
+                this.hoveredBeam = beam;
+                this.hoveredBeamFace = intersects[0].face;
+            } else {
+                this.hoveredBeam = null;
+                this.hoveredBeamFace = null;
+            }
+
+            return;
+        }
+
         const beam = this.appState.selectedBeam;
         if (!beam || !this.mouse1Down || !this.prevMouseIntersection || !this.intersectionOnBeam) return;
 
@@ -58,16 +91,35 @@ export class SelectBeamInputMode extends InputMode {
 
         let intersection = new THREE.Vector3();
         let posY = beam.position.y;
+        const down = new THREE.Vector3(0, -1, 0);
+        const candidateFaces = [
+            { name: 'left', vec: new THREE.Vector3(-1, 0, 0), offset: beam.dimensions.length / 2 },
+            { name: 'right', vec: new THREE.Vector3(1, 0, 0), offset: beam.dimensions.length / 2 },
+            { name: 'front', vec: new THREE.Vector3(0, 0, 1), offset: beam.dimensions.depth / 2 },
+            { name: 'back', vec: new THREE.Vector3(0, 0, -1), offset: beam.dimensions.depth / 2 },
+            { name: 'bottom', vec: new THREE.Vector3(0, -1, 0), offset: beam.dimensions.height / 2 },
+            { name: 'top', vec: new THREE.Vector3(0, 1, 0), offset: beam.dimensions.height / 2 }
+        ];
+        let bestFace = candidateFaces[0];
+        let bestDot = -Infinity;
+        for (const face of candidateFaces) {
+            const worldNormal = face.vec.clone().applyQuaternion(beam.quaternion).normalize();
+            const dot = worldNormal.dot(down);
+            if (dot > bestDot) {
+                bestDot = dot;
+                bestFace = face;
+            }
+        }
         if (intersects.length > 0) {
             let y = intersects[0].point.y;
             const originalIntersectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.intersectionOnBeam.y);
             rayCaster.ray.intersectPlane(originalIntersectionPlane, intersection)!;
             intersection.setY(y);
-            posY = y + (beam.dimensions.height / 2);
+            posY = y + bestFace.offset;
         } else {
             const originalIntersectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.intersectionOnBeam.y);
             rayCaster.ray.intersectPlane(originalIntersectionPlane, intersection)!;
-            posY = beam.dimensions.height / 2;
+            posY = bestFace.offset;
         }
 
         this.curMouseIntersection = intersection;
@@ -103,6 +155,7 @@ export class SelectBeamInputMode extends InputMode {
                 this.beamManager.deleteBeam(this.appState.selectedBeam);
             }
         }
+
         if (key === 'r') {
             const beam = this.appState.selectedBeam;
             if (beam) {
@@ -119,7 +172,43 @@ export class SelectBeamInputMode extends InputMode {
     setBeamOrientation() {
         if (!this.appState.selectedBeam) return;
 
-        this.appState.selectedBeam.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), this.orientation);
+        const beam = this.appState.selectedBeam;
+        const down = new THREE.Vector3(0, -1, 0);
+
+        // Define candidate local face normals.
+        const candidateFaces = [
+            { name: 'left', vec: new THREE.Vector3(-1, 0, 0) },
+            { name: 'right', vec: new THREE.Vector3(1, 0, 0) },
+            { name: 'front', vec: new THREE.Vector3(0, 0, 1) },
+            { name: 'back', vec: new THREE.Vector3(0, 0, -1) },
+            { name: 'bottom', vec: new THREE.Vector3(0, -1, 0) },
+            { name: 'top', vec: new THREE.Vector3(0, 1, 0) }
+        ];
+
+        // Find the face whose world normal is most aligned with 'down'
+        let bestFace: { name: string; worldNormal: THREE.Vector3 } | null = null;
+        let bestDot = -Infinity;
+        for (const face of candidateFaces) {
+            const worldNormal = face.vec.clone().applyQuaternion(beam.quaternion).normalize();
+            const dot = worldNormal.dot(down);
+            if (dot > bestDot) {
+                bestDot = dot;
+                bestFace = { name: face.name, worldNormal };
+            }
+        }
+
+        // Rotate around an axis that keeps the downward face fixed.
+        let axis: THREE.Vector3;
+        const angle = Math.PI / 2;
+        // If the selected face is nearly collinear with down (i.e. bottom or top), use the world up.
+        if (Math.abs(bestFace!.worldNormal.dot(down)) > 0.95) {
+            axis = new THREE.Vector3(0, 1, 0);
+        } else {
+            // Otherwise, compute an axis perpendicular to both the face normal and down.
+            axis = bestFace!.worldNormal.clone().cross(down).normalize();
+        }
+        const rotQuat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        beam.quaternion.copy(rotQuat.multiply(beam.quaternion.clone()));
     }
 
     destroy(): void {
