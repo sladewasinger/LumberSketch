@@ -1,6 +1,11 @@
 import { Beam } from "./Beam";
 import * as THREE from "three";
 
+export type GuiInputMode = 'place-beam' | 'select-beam' | 'cut-beam' | null;
+export type GuiState = {
+    inputMode: GuiInputMode;
+};
+
 export class AppState {
     private static instance: AppState;
 
@@ -11,8 +16,10 @@ export class AppState {
         0.1,
         1000
     );
+    public guiState: GuiState = {
+        inputMode: null,
+    };
 
-    public beams: Beam[] = [];
     public selectedBeam: Beam | null = null;
     public mousePos: THREE.Vector2 = new THREE.Vector2(0, 0);
     public container: HTMLElement | null = null;

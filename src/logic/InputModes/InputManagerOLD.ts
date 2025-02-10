@@ -127,7 +127,7 @@ export class InputManagerOLD {
         if (key == 'delete') {
             if (this.selectedBeams.length > 0) {
                 for (const beam of this.selectedBeams) {
-                    this.beamManager.removeBeam(beam as Beam);
+                    this.beamManager.deleteBeam(beam as Beam);
                 }
                 this.selectedBeams = [];
                 eventBus.emit(EVENT_BEAMS_DESELECTED);

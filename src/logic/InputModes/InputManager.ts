@@ -1,6 +1,7 @@
-import { EVENT_GUI_PLACE_BEAM_CLICKED } from "../../events/Constants";
+import { EVENT_GUI_INPUT_MODE_CHANGED } from "../../events/Constants";
 import { eventBus } from "../../events/EventBus";
 import { AppState } from "../AppState";
+import { BeamManager } from "../BeamManager";
 import { InputMode } from "./InputMode";
 import { PlaceBeamInputMode } from "./PlaceBeamInputMode";
 import { SelectBeamInputMode } from "./SelectBeamInputMode";
@@ -11,6 +12,7 @@ export class InputManager {
     inputMode: InputMode | null = null;
 
     constructor(
+        private beamManager: BeamManager,
     ) {
         this.appState = AppState.getInstance();
         if (!this.appState.container)
@@ -22,8 +24,21 @@ export class InputManager {
         window.addEventListener('keydown', this.onKeyDown.bind(this));
         window.addEventListener('keyup', this.onKeyUp.bind(this));
 
-        eventBus.on(EVENT_GUI_PLACE_BEAM_CLICKED, () => {
-            this.changeInputMode(new PlaceBeamInputMode());
+        eventBus.on(EVENT_GUI_INPUT_MODE_CHANGED, () => {
+            switch (this.appState.guiState.inputMode) {
+                case 'place-beam':
+                    this.changeInputMode(new PlaceBeamInputMode(this.beamManager));
+                    break;
+                case 'select-beam':
+                    this.changeInputMode(new SelectBeamInputMode(this.beamManager));
+                    break;
+                case 'cut-beam':
+                    this.changeInputMode(null);
+                    break;
+                default:
+                    this.changeInputMode(null);
+                    break;
+            }
         });
     }
 
@@ -45,7 +60,6 @@ export class InputManager {
             (event.clientX / window.innerWidth) * 2 - 1,
             -(event.clientY / window.innerHeight) * 2 + 1
         ));
-        console.log(this.appState.mousePos);
 
         this.inputMode?.onMouseMove(event);
     }
@@ -55,24 +69,13 @@ export class InputManager {
     }
 
     onKeyDown(event: KeyboardEvent) {
-        const key = event.key.toLowerCase();
-        switch (key) {
-            case '1':
-                this.changeInputMode(new PlaceBeamInputMode());
-                break;
-            case '2':
-                this.changeInputMode(new SelectBeamInputMode());
-                break;
-            default:
-                break;
-        }
         this.inputMode?.onKeyDown(event);
     }
 
     onKeyUp(event: KeyboardEvent) {
         const key = event.key.toLowerCase();
         if (key === 'escape') {
-            this.changeInputMode(new SelectBeamInputMode());
+            this.changeInputMode(new SelectBeamInputMode(this.beamManager));
         }
         this.inputMode?.onKeyUp(event);
     }

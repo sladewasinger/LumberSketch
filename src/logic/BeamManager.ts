@@ -7,10 +7,12 @@ import { AppState } from './AppState';
 
 export class BeamManager {
     private beamsGroup: THREE.Group;
+    private appState: AppState;
+    private beams: Beam[] = [];
 
     constructor() {
-        const appState = AppState.getInstance();
-        const scene = appState.scene;
+        this.appState = AppState.getInstance();
+        const scene = this.appState.scene;
 
         this.beamsGroup = new THREE.Group();
         scene.add(this.beamsGroup);
@@ -28,13 +30,18 @@ export class BeamManager {
 
     public addBeam(beam: Beam): void {
         this.beamsGroup.add(beam);
+        this.beams.push(beam);
     }
 
-    public removeBeam(beam: Beam) {
+    public deleteBeam(beam: Beam) {
         this.beamsGroup.remove(beam);
+        const index = this.beams.indexOf(beam);
+        if (index > -1) {
+            this.beams.splice(index, 1);
+        }
     }
 
-    public getBeamsGroup(): THREE.Group {
-        return this.beamsGroup;
+    public getBeams(): Beam[] {
+        return this.beams.slice(0); // Return a copy of the array
     }
 }

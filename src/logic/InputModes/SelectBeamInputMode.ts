@@ -10,7 +10,7 @@ export class SelectBeamInputMode extends InputMode {
     appState: AppState;
     mouse1Down = false;
 
-    constructor() {
+    constructor(private beamManager: BeamManager) {
         super();
         this.appState = AppState.getInstance();
         document.body.style.cursor = 'pointer';
@@ -34,7 +34,7 @@ export class SelectBeamInputMode extends InputMode {
 
         const rayCaster = new THREE.Raycaster();
         rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
-        const intersects = rayCaster.intersectObjects(this.appState.beams, false);
+        const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
 
         if (intersects.length > 0) {
             const beam = intersects[0].object as Beam;
@@ -42,13 +42,22 @@ export class SelectBeamInputMode extends InputMode {
             eventBus.emit(EVENT_BEAM_SELECTED, beam);
         } else {
             this.appState.selectedBeam = null;
+            eventBus.emit(EVENT_BEAM_DESELECTED);
         }
     }
 
     onMouseUp(event: MouseEvent): void {
         if (event.button !== 0) return;
         this.mouse1Down = false;
-        eventBus.emit(EVENT_BEAM_DESELECTED);
+    }
+
+    onKeyDown(event: KeyboardEvent): void {
+        const key = event.key.toLowerCase();
+        if (key === 'delete' || key === 'd') {
+            if (this.appState.selectedBeam) {
+                this.beamManager.deleteBeam(this.appState.selectedBeam);
+            }
+        }
     }
 
     destroy(): void {

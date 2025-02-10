@@ -32,14 +32,14 @@ export class DependencyContainer {
         );
         this.beamManager = new BeamManager();
         this.measurementDisplay = new MeasurementDisplay(measurementDiv);
-        this.inputManager = new InputManager();
+        this.inputManager = new InputManager(this.beamManager);
         this.cursorProjection = new CursorProjection(
             this.sceneManager.renderer,
             this.beamManager
         );
         this.guiManager = new GuiManager();
 
-        this.inputManager.inputMode = new SelectBeamInputMode();
+        this.inputManager.inputMode = new SelectBeamInputMode(this.beamManager);
     }
 
     public static getInstance(container?: HTMLElement, measurementDiv?: HTMLElement): DependencyContainer {

@@ -45,7 +45,7 @@ export class CursorProjection {
     getMouseIntersectionAndPlaneNormal(): [THREE.Vector3, THREE.Vector3] {
         this.raycaster.setFromCamera(this.mouse, this.appState.camera);
 
-        const intersects = this.raycaster.intersectObjects(this.beamManager.getBeamsGroup().children, false);
+        const intersects = this.raycaster.intersectObjects(this.beamManager.getBeams(), false);
 
         if (intersects.length > 0) {
             const beam = intersects[0].object as Beam;

@@ -8,4 +8,5 @@
         }
     },
     "files.autoSave": "onFocusChange",
+    "editor.gotoLocation.multipleDefinitions": "goto"
 }
