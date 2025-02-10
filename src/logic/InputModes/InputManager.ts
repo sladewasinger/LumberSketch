@@ -69,11 +69,16 @@ export class InputManager {
     }
 
     onKeyDown(event: KeyboardEvent) {
+        const key = event.key.toLowerCase();
+        this.appState.keysDown.add(event.key.toLowerCase());
         this.inputMode?.onKeyDown(event);
     }
 
     onKeyUp(event: KeyboardEvent) {
         const key = event.key.toLowerCase();
+
+        this.appState.keysDown.delete(key);
+
         if (key === 'escape') {
             this.changeInputMode(new SelectBeamInputMode(this.beamManager));
         }

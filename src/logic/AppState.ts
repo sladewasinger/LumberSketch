@@ -25,7 +25,7 @@ export class AppState {
     public container: HTMLElement | null = null;
 
     // Input Related:
-    private keysDown: Set<string> = new Set();
+    public keysDown: Set<string> = new Set();
 
     private constructor() { }
 
