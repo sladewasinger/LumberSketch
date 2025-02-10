@@ -6,7 +6,7 @@ import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectio
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { eventBus } from '../events/EventBus';
-import { EVENT_BEAM_DESELECTED, EVENT_BEAM_SELECTED } from '../events/Constants';
+import { EVENT_BEAM_SELECTION_CHANGED } from '../events/Constants';
 import { AppState } from './AppState';
 
 export class PostProcessingManager {
@@ -47,11 +47,11 @@ export class PostProcessingManager {
         this.onWindowResize();
 
         // Listen for selection events:
-        eventBus.on(EVENT_BEAM_SELECTED, (selectedObject: THREE.Object3D) => {
-            outlinePass.selectedObjects = [selectedObject];
-        });
-        eventBus.on(EVENT_BEAM_DESELECTED, () => {
-            outlinePass.selectedObjects = [];
+        eventBus.on(EVENT_BEAM_SELECTION_CHANGED, () => {
+            if (appState.selectedBeam === null)
+                outlinePass.selectedObjects = [];
+            else
+                outlinePass.selectedObjects = [appState.selectedBeam]
         });
     }
 

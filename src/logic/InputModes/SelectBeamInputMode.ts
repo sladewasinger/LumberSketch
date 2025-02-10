@@ -1,4 +1,4 @@
-import { EVENT_BEAM_DESELECTED, EVENT_BEAM_SELECTED } from "../../events/Constants";
+import { EVENT_BEAM_SELECTION_CHANGED } from "../../events/Constants";
 import { eventBus } from "../../events/EventBus";
 import { AppState } from "../AppState";
 import { Beam } from "../Beam";
@@ -39,10 +39,10 @@ export class SelectBeamInputMode extends InputMode {
         if (intersects.length > 0) {
             const beam = intersects[0].object as Beam;
             this.appState.selectedBeam = beam;
-            eventBus.emit(EVENT_BEAM_SELECTED, beam);
+            eventBus.emit(EVENT_BEAM_SELECTION_CHANGED);
         } else {
             this.appState.selectedBeam = null;
-            eventBus.emit(EVENT_BEAM_DESELECTED);
+            eventBus.emit(EVENT_BEAM_SELECTION_CHANGED);
         }
     }
 

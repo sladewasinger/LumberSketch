@@ -37,6 +37,7 @@ export class PlaceBeamInputMode extends InputMode {
         if (event.button !== 0) return;
 
         const newBeam = this.ghostBeam.clone();
+        newBeam.setOpacity(1);
         this.beamManager.addBeam(newBeam);
     }
 

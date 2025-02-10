@@ -53,8 +53,13 @@ export class Beam extends THREE.Mesh {
         return new THREE.Vector3(-this.dimensions.length / 2, -this.dimensions.height / 2, -this.dimensions.depth / 2);
     }
 
-    public clone(recursive?: boolean): this {
-        return new Beam(this.dimensions, this.material as THREE.Material)
-            .copy(this, recursive) as this;
+    public clone(): this {
+        const newBeam = new Beam(this.dimensions);
+        newBeam.position.copy(this.position);
+        newBeam.quaternion.copy(this.quaternion);
+        newBeam.scale.copy(this.scale);
+        newBeam.userData = { ...this.userData };
+
+        return newBeam as this;
     }
 }
