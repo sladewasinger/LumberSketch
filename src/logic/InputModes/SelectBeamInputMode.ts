@@ -127,17 +127,19 @@ export class SelectBeamInputMode extends InputMode {
         let deltaX = this.curMouseIntersection.x - this.prevMouseIntersection.x;
         let deltaZ = this.curMouseIntersection.z - this.prevMouseIntersection.z;
 
-        const snapThreshold = 0.4;
+        const snapThreshold = 0.75;
+        const edgeSnapThreshold = 0.75;
         let foundSnap = false;
         const movingBeam = beam;
         movingBeam.updateMatrixWorld();
 
-        // Get moving beam vertices in world coordinates (assumes BufferGeometry)
+        // Vertex snapping
         const movingGeometry = movingBeam.geometry as THREE.BufferGeometry;
         const mvAttr = movingGeometry.attributes.position;
         let snapAdjustment = new THREE.Vector3();
 
         if (this.intersectionOnBeam.distanceTo(this.curMouseIntersection.clone().setY(this.intersectionOnBeam.y)) > snapThreshold * 2) {
+            // Hack to disable let the user unsnap the beam
             foundSnap = true;
             snapAdjustment.set(deltaX, 0, deltaZ);
         }
@@ -167,6 +169,45 @@ export class SelectBeamInputMode extends InputMode {
         if (foundSnap) {
             deltaX = snapAdjustment.x;
             deltaZ = snapAdjustment.z;
+        } else {
+            // Edge snapping: project beam bounding boxes on the XZ plane and snap edges if within threshold.
+            let snapX = 0;
+            let snapZ = 0;
+
+            // Compute current moving beam box and its predicted position if moved by delta
+            const currentBox = new THREE.Box3().setFromObject(movingBeam);
+            const predictedBox = currentBox.clone().translate(new THREE.Vector3(deltaX, 0, deltaZ));
+            const movingEdgesX = [predictedBox.min.x, predictedBox.max.x];
+            const movingEdgesZ = [predictedBox.min.z, predictedBox.max.z];
+
+            for (const otherBeam of this.beamManager.getBeams()) {
+                if (otherBeam === movingBeam) continue;
+                otherBeam.updateMatrixWorld();
+                const otherBox = new THREE.Box3().setFromObject(otherBeam);
+                const otherEdgesX = [otherBox.min.x, otherBox.max.x];
+                const otherEdgesZ = [otherBox.min.z, otherBox.max.z];
+
+                for (const mX of movingEdgesX) {
+                    for (const oX of otherEdgesX) {
+                        const diff = oX - mX;
+                        if (Math.abs(diff) < edgeSnapThreshold && (snapX === 0 || Math.abs(diff) < Math.abs(snapX))) {
+                            snapX = diff;
+                        }
+                    }
+                }
+                for (const mZ of movingEdgesZ) {
+                    for (const oZ of otherEdgesZ) {
+                        const diff = oZ - mZ;
+                        if (Math.abs(diff) < edgeSnapThreshold && (snapZ === 0 || Math.abs(diff) < Math.abs(snapZ))) {
+                            snapZ = diff;
+                        }
+                    }
+                }
+            }
+            if (snapX !== 0 || snapZ !== 0) {
+                deltaX += snapX;
+                deltaZ += snapZ;
+            }
         }
 
         if (this.appState.keysDown.has('z')) {
