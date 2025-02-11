@@ -15,7 +15,6 @@ export class SelectBeamInputMode extends InputMode {
     orientation: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
     hoveredBeam: Beam | null = null;
     hoveredBeamFace: THREE.Face | null = null;
-    snapInitialMousePos: THREE.Vector2 | null = null;
 
     constructor(private beamManager: BeamManager) {
         super();
@@ -61,155 +60,85 @@ export class SelectBeamInputMode extends InputMode {
     }
 
     onMouseMove(event: MouseEvent): void {
-        this.beamManager.getBeams().forEach(x => x.removeHighlights());
+        this.clearHighlights();
 
         if (this.appState.keysDown.has('f')) {
-            const rayCaster = new THREE.Raycaster();
-            rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
-            const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
-
-            if (intersects.length > 0 && intersects[0].face) {
-                const beam = intersects[0].object as Beam;
-                beam.highlightFace(intersects[0].face, new THREE.Color(0x00ff00));
-                this.hoveredBeam = beam;
-                this.hoveredBeamFace = intersects[0].face;
-            } else {
-                this.hoveredBeam = null;
-                this.hoveredBeamFace = null;
-            }
-
+            this.handleFaceHighlight();
             return;
         }
 
-        const beam = this.appState.selectedBeam;
-        if (!beam || !this.mouse1Down || !this.prevMouseIntersection || !this.intersectionOnBeam) return;
+        this.handleBeamMove();
+    }
 
-        console.log('here');
+    private clearHighlights(): void {
+        this.beamManager.getBeams().forEach(beam => beam.removeHighlights());
+    }
 
+    private handleFaceHighlight(): void {
         const rayCaster = new THREE.Raycaster();
         rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
-        const intersects = rayCaster.intersectObjects(this.beamManager.getBeams().filter(x => x != beam), false);
+        const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
 
+        if (intersects.length > 0 && intersects[0].face) {
+            const beam = intersects[0].object as Beam;
+            beam.highlightFace(intersects[0].face, new THREE.Color(0x00ff00));
+            this.hoveredBeam = beam;
+            this.hoveredBeamFace = intersects[0].face;
+        } else {
+            this.hoveredBeam = null;
+            this.hoveredBeamFace = null;
+        }
+    }
+
+    /** Moves the selected beam using your original snapping logic */
+    private handleBeamMove(): void {
+        const beam = this.appState.selectedBeam;
+        if (!beam || !this.mouse1Down || !this.prevMouseIntersection || !this.intersectionOnBeam) {
+            return;
+        }
+
+        // Set up the raycaster to determine an intersection with other beams.
+        const rayCaster = new THREE.Raycaster();
+        rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
+        const otherBeams = this.beamManager.getBeams().filter(b => b !== beam);
+        const intersects = rayCaster.intersectObjects(otherBeams, false);
+
+        // Determine which face of the beam to use (to compute a Y offset).
+        const candidateFace = this.getBottomFace(beam);
+
+        // Compute a new intersection point (and Y position) using a horizontal plane.
         let intersection = new THREE.Vector3();
         let posY = beam.position.y;
-        const down = new THREE.Vector3(0, -1, 0);
-        const candidateFaces = [
-            { name: 'left', vec: new THREE.Vector3(-1, 0, 0), offset: beam.dimensions.length / 2 },
-            { name: 'right', vec: new THREE.Vector3(1, 0, 0), offset: beam.dimensions.length / 2 },
-            { name: 'front', vec: new THREE.Vector3(0, 0, 1), offset: beam.dimensions.depth / 2 },
-            { name: 'back', vec: new THREE.Vector3(0, 0, -1), offset: beam.dimensions.depth / 2 },
-            { name: 'bottom', vec: new THREE.Vector3(0, -1, 0), offset: beam.dimensions.height / 2 },
-            { name: 'top', vec: new THREE.Vector3(0, 1, 0), offset: beam.dimensions.height / 2 }
-        ];
-        let bestFace = candidateFaces[0];
-        let bestDot = -Infinity;
-        for (const face of candidateFaces) {
-            const worldNormal = face.vec.clone().applyQuaternion(beam.quaternion).normalize();
-            const dot = worldNormal.dot(down);
-            if (dot > bestDot) {
-                bestDot = dot;
-                bestFace = face;
-            }
-        }
+        const intersectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.intersectionOnBeam.y);
+
         if (intersects.length > 0) {
-            let y = intersects[0].point.y;
-            const originalIntersectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.intersectionOnBeam.y);
-            rayCaster.ray.intersectPlane(originalIntersectionPlane, intersection)!;
+            const y = intersects[0].point.y;
+            rayCaster.ray.intersectPlane(intersectionPlane, intersection);
             intersection.setY(y);
-            posY = y + bestFace.offset;
+            posY = y + candidateFace.offset;
         } else {
-            const originalIntersectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.intersectionOnBeam.y);
-            rayCaster.ray.intersectPlane(originalIntersectionPlane, intersection)!;
-            posY = bestFace.offset;
+            rayCaster.ray.intersectPlane(intersectionPlane, intersection);
+            posY = candidateFace.offset;
         }
 
+        // Calculate the base movement delta.
         this.curMouseIntersection = intersection;
         let deltaX = this.curMouseIntersection.x - this.prevMouseIntersection.x;
         let deltaZ = this.curMouseIntersection.z - this.prevMouseIntersection.z;
 
+        // Define snapping thresholds.
         const snapThreshold = 0.75;
         const edgeSnapThreshold = 0.75;
-        let foundSnap = false;
-        const movingBeam = beam;
-        movingBeam.updateMatrixWorld();
 
-        // Vertex snapping
-        const movingGeometry = movingBeam.geometry as THREE.BufferGeometry;
-        const mvAttr = movingGeometry.attributes.position;
-        let snapAdjustment = new THREE.Vector3();
-
-        if (this.intersectionOnBeam.distanceTo(this.curMouseIntersection.clone().setY(this.intersectionOnBeam.y)) > snapThreshold * 2) {
-            // Hack to disable let the user unsnap the beam
-            foundSnap = true;
-            snapAdjustment.set(deltaX, 0, deltaZ);
-        }
-
-        for (let i = 0; i < mvAttr.count && !foundSnap; i++) {
-            const movingVertex = new THREE.Vector3().fromBufferAttribute(mvAttr, i);
-            movingBeam.localToWorld(movingVertex);
-
-            for (const otherBeam of this.beamManager.getBeams()) {
-                if (otherBeam === movingBeam) continue;
-                otherBeam.updateMatrixWorld();
-                const otherGeometry = otherBeam.geometry as THREE.BufferGeometry;
-                const ovAttr = otherGeometry.attributes.position;
-
-                for (let j = 0; j < ovAttr.count; j++) {
-                    const otherVertex = new THREE.Vector3().fromBufferAttribute(ovAttr, j);
-                    otherBeam.localToWorld(otherVertex);
-                    if (movingVertex.distanceTo(otherVertex) < snapThreshold) {
-                        snapAdjustment.copy(otherVertex).sub(movingVertex);
-                        foundSnap = true;
-                        break;
-                    }
-                }
-                if (foundSnap) break;
-            }
-        }
-        if (foundSnap) {
-            deltaX = snapAdjustment.x;
-            deltaZ = snapAdjustment.z;
-        } else {
-            // Edge snapping: project beam bounding boxes on the XZ plane and snap edges if within threshold.
-            let snapX = 0;
-            let snapZ = 0;
-
-            // Compute current moving beam box and its predicted position if moved by delta
-            const currentBox = new THREE.Box3().setFromObject(movingBeam);
-            const predictedBox = currentBox.clone().translate(new THREE.Vector3(deltaX, 0, deltaZ));
-            const movingEdgesX = [predictedBox.min.x, predictedBox.max.x];
-            const movingEdgesZ = [predictedBox.min.z, predictedBox.max.z];
-
-            for (const otherBeam of this.beamManager.getBeams()) {
-                if (otherBeam === movingBeam) continue;
-                otherBeam.updateMatrixWorld();
-                const otherBox = new THREE.Box3().setFromObject(otherBeam);
-                const otherEdgesX = [otherBox.min.x, otherBox.max.x];
-                const otherEdgesZ = [otherBox.min.z, otherBox.max.z];
-
-                for (const mX of movingEdgesX) {
-                    for (const oX of otherEdgesX) {
-                        const diff = oX - mX;
-                        if (Math.abs(diff) < edgeSnapThreshold && (snapX === 0 || Math.abs(diff) < Math.abs(snapX))) {
-                            snapX = diff;
-                        }
-                    }
-                }
-                for (const mZ of movingEdgesZ) {
-                    for (const oZ of otherEdgesZ) {
-                        const diff = oZ - mZ;
-                        if (Math.abs(diff) < edgeSnapThreshold && (snapZ === 0 || Math.abs(diff) < Math.abs(snapZ))) {
-                            snapZ = diff;
-                        }
-                    }
-                }
-            }
-            if (snapX !== 0 || snapZ !== 0) {
-                deltaX += snapX;
-                deltaZ += snapZ;
+        if (this.intersectionOnBeam.distanceTo(this.curMouseIntersection.clone().setY(this.intersectionOnBeam.y)) < snapThreshold * 2) {
+            const snap = this.performVertexSnapping(beam, snapThreshold) || this.performEdgeSnapping(beam, deltaX, deltaZ, edgeSnapThreshold);
+            if (snap) {
+                deltaX = snap.x;
+                deltaZ = snap.z;
             }
         }
 
+        // Apply key–modifier constraints.
         if (this.appState.keysDown.has('z')) {
             deltaX = 0;
             posY = beam.position.y;
@@ -224,7 +153,119 @@ export class SelectBeamInputMode extends InputMode {
         }
         beam.position.setY(posY);
         beam.position.add(new THREE.Vector3(deltaX, 0, deltaZ));
+
         this.prevMouseIntersection = this.curMouseIntersection.clone();
+    }
+
+    /**
+     * Chooses the beam face (and its offset) most aligned with downward
+     * so that we know how to position the beam vertically.
+     */
+    private getBottomFace(beam: Beam): { name: string; offset: number } {
+        const down = new THREE.Vector3(0, -1, 0);
+        const candidateFaces = [
+            { name: 'left', vec: new THREE.Vector3(-1, 0, 0), offset: beam.dimensions.length / 2 },
+            { name: 'right', vec: new THREE.Vector3(1, 0, 0), offset: beam.dimensions.length / 2 },
+            { name: 'front', vec: new THREE.Vector3(0, 0, 1), offset: beam.dimensions.depth / 2 },
+            { name: 'back', vec: new THREE.Vector3(0, 0, -1), offset: beam.dimensions.depth / 2 },
+            { name: 'bottom', vec: new THREE.Vector3(0, -1, 0), offset: beam.dimensions.height / 2 },
+            { name: 'top', vec: new THREE.Vector3(0, 1, 0), offset: beam.dimensions.height / 2 }
+        ];
+
+        let bestFace = candidateFaces[0];
+        let bestDot = -Infinity;
+        for (const face of candidateFaces) {
+            const worldNormal = face.vec.clone().applyQuaternion(beam.quaternion).normalize();
+            const dot = worldNormal.dot(down);
+            if (dot > bestDot) {
+                bestDot = dot;
+                bestFace = face;
+            }
+        }
+        return bestFace;
+    }
+
+    /**
+     * Iterates over all vertices of the beam and returns an offset vector (if any)
+     * that aligns one of its vertices with a nearby vertex on another beam.
+     */
+    private performVertexSnapping(movingBeam: Beam, snapThreshold: number): THREE.Vector3 | null {
+        movingBeam.updateMatrixWorld();
+        const geometry = movingBeam.geometry as THREE.BufferGeometry;
+        const positions = geometry.attributes.position;
+
+        for (let i = 0; i < positions.count; i++) {
+            const movingVertex = new THREE.Vector3().fromBufferAttribute(positions, i);
+            movingBeam.localToWorld(movingVertex);
+
+            for (const otherBeam of this.beamManager.getBeams()) {
+                if (otherBeam === movingBeam) continue;
+                otherBeam.updateMatrixWorld();
+                const otherGeometry = otherBeam.geometry as THREE.BufferGeometry;
+                const otherPositions = otherGeometry.attributes.position;
+
+                for (let j = 0; j < otherPositions.count; j++) {
+                    const otherVertex = new THREE.Vector3().fromBufferAttribute(otherPositions, j);
+                    otherBeam.localToWorld(otherVertex);
+                    if (movingVertex.distanceTo(otherVertex) < snapThreshold) {
+                        return otherVertex.clone().sub(movingVertex);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private performEdgeSnapping(beam: Beam, deltaX: number, deltaZ: number, edgeSnapThreshold: number): THREE.Vector3 | null {
+        // Translate the beam's current bounds
+        const translation = new THREE.Vector3(deltaX, 0, deltaZ);
+        const currentBox = new THREE.Box3().setFromObject(beam);
+        const predictedBox = currentBox.clone().translate(translation);
+
+        // Define the axes we want to consider.
+        const axes = ['x', 'z'] as const;
+        const predictedEdges: Record<typeof axes[number], [number, number]> = {
+            x: [predictedBox.min.x, predictedBox.max.x],
+            z: [predictedBox.min.z, predictedBox.max.z],
+        };
+
+        // Store the best snapping difference for each axis (if any)
+        const bestDiff: Record<typeof axes[number], number | null> = { x: null, z: null };
+
+        // Iterate over each axis
+        for (const axis of axes) {
+            // Loop through all other beams
+            for (const otherBeam of this.beamManager.getBeams()) {
+                if (otherBeam === beam) continue;
+                const otherBox = new THREE.Box3().setFromObject(otherBeam);
+                const otherEdges: [number, number] = axis === 'x'
+                    ? [otherBox.min.x, otherBox.max.x]
+                    : [otherBox.min.z, otherBox.max.z];
+                // Compare each predicted edge with the corresponding edges of the other beam
+                for (const movingEdge of predictedEdges[axis]) {
+                    for (const otherEdge of otherEdges) {
+                        const diff = otherEdge - movingEdge;
+                        if (Math.abs(diff) < edgeSnapThreshold) {
+                            // Choose the smallest snap difference if several candidates exist.
+                            if (bestDiff[axis] === null || Math.abs(diff) < Math.abs(bestDiff[axis]!)) {
+                                bestDiff[axis] = diff;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If a snap is found, adjust the movement on the snapping axis while leaving the other axis free.
+        const snappedX = bestDiff.x !== null ? deltaX + bestDiff.x : deltaX;
+        const snappedZ = bestDiff.z !== null ? deltaZ + bestDiff.z : deltaZ;
+
+        // Only return a snap adjustment if any axis qualifies, otherwise let the beam move freely.
+        if (bestDiff.x === null && bestDiff.z === null) {
+            return null;
+        }
+
+        return new THREE.Vector3(snappedX, 0, snappedZ);
     }
 
     onMouseUp(event: MouseEvent): void {
