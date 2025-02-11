@@ -15,6 +15,7 @@ export class SelectBeamInputMode extends InputMode {
     orientation: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
     hoveredBeam: Beam | null = null;
     hoveredBeamFace: THREE.Face | null = null;
+    snapInitialMousePos: THREE.Vector2 | null = null;
 
     constructor(private beamManager: BeamManager) {
         super();
@@ -125,6 +126,48 @@ export class SelectBeamInputMode extends InputMode {
         this.curMouseIntersection = intersection;
         let deltaX = this.curMouseIntersection.x - this.prevMouseIntersection.x;
         let deltaZ = this.curMouseIntersection.z - this.prevMouseIntersection.z;
+
+        const snapThreshold = 0.4;
+        let foundSnap = false;
+        const movingBeam = beam;
+        movingBeam.updateMatrixWorld();
+
+        // Get moving beam vertices in world coordinates (assumes BufferGeometry)
+        const movingGeometry = movingBeam.geometry as THREE.BufferGeometry;
+        const mvAttr = movingGeometry.attributes.position;
+        let snapAdjustment = new THREE.Vector3();
+
+        if (this.intersectionOnBeam.distanceTo(this.curMouseIntersection.clone().setY(this.intersectionOnBeam.y)) > snapThreshold * 2) {
+            foundSnap = true;
+            snapAdjustment.set(deltaX, 0, deltaZ);
+        }
+
+        for (let i = 0; i < mvAttr.count && !foundSnap; i++) {
+            const movingVertex = new THREE.Vector3().fromBufferAttribute(mvAttr, i);
+            movingBeam.localToWorld(movingVertex);
+
+            for (const otherBeam of this.beamManager.getBeams()) {
+                if (otherBeam === movingBeam) continue;
+                otherBeam.updateMatrixWorld();
+                const otherGeometry = otherBeam.geometry as THREE.BufferGeometry;
+                const ovAttr = otherGeometry.attributes.position;
+
+                for (let j = 0; j < ovAttr.count; j++) {
+                    const otherVertex = new THREE.Vector3().fromBufferAttribute(ovAttr, j);
+                    otherBeam.localToWorld(otherVertex);
+                    if (movingVertex.distanceTo(otherVertex) < snapThreshold) {
+                        snapAdjustment.copy(otherVertex).sub(movingVertex);
+                        foundSnap = true;
+                        break;
+                    }
+                }
+                if (foundSnap) break;
+            }
+        }
+        if (foundSnap) {
+            deltaX = snapAdjustment.x;
+            deltaZ = snapAdjustment.z;
+        }
 
         if (this.appState.keysDown.has('z')) {
             deltaX = 0;
