@@ -189,24 +189,34 @@ export class SelectBeamInputMode extends InputMode {
      * Iterates over all vertices of the beam and returns an offset vector (if any)
      * that aligns one of its vertices with a nearby vertex on another beam.
      */
-    private performVertexSnapping(movingBeam: Beam, snapThreshold: number): THREE.Vector3 | null {
-        movingBeam.updateMatrixWorld();
-        const geometry = movingBeam.geometry as THREE.BufferGeometry;
-        const positions = geometry.attributes.position;
-
+    // Helper to get all world-space vertices from a mesh's geometry.
+    private getWorldVertices(mesh: Beam): THREE.Vector3[] {
+        mesh.updateMatrixWorld(true);
+        let geo = mesh.geometry;
+        // Ensure non-indexed geometry for simplicity.
+        if (geo.index) {
+            geo = geo.toNonIndexed();
+        }
+        const positions = geo.attributes.position;
+        const vertices: THREE.Vector3[] = [];
+        const vertex = new THREE.Vector3();
         for (let i = 0; i < positions.count; i++) {
-            const movingVertex = new THREE.Vector3().fromBufferAttribute(positions, i);
-            movingBeam.localToWorld(movingVertex);
+            vertex.fromBufferAttribute(positions, i);
+            vertex.applyMatrix4(mesh.matrixWorld);
+            vertices.push(vertex.clone());
+        }
+        return vertices;
+    }
 
-            for (const otherBeam of this.beamManager.getBeams()) {
-                if (otherBeam === movingBeam) continue;
-                otherBeam.updateMatrixWorld();
-                const otherGeometry = otherBeam.geometry as THREE.BufferGeometry;
-                const otherPositions = otherGeometry.attributes.position;
-
-                for (let j = 0; j < otherPositions.count; j++) {
-                    const otherVertex = new THREE.Vector3().fromBufferAttribute(otherPositions, j);
-                    otherBeam.localToWorld(otherVertex);
+    private performVertexSnapping(movingBeam: Beam, snapThreshold: number): THREE.Vector3 | null {
+        const movingVertices = this.getWorldVertices(movingBeam);
+        // Iterate over all other beams.
+        for (const otherBeam of this.beamManager.getBeams()) {
+            if (otherBeam === movingBeam) continue;
+            const otherVertices = this.getWorldVertices(otherBeam);
+            // Compare each vertex of the moving beam with each vertex from the other beam.
+            for (const movingVertex of movingVertices) {
+                for (const otherVertex of otherVertices) {
                     if (movingVertex.distanceTo(otherVertex) < snapThreshold) {
                         return otherVertex.clone().sub(movingVertex);
                     }
