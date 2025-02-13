@@ -4,7 +4,7 @@ import { ControlsManager } from "../logic/ControlsManager";
 import { CursorProjection } from "../logic/CursorProjection";
 import { GuiManager } from "../logic/GuiManager";
 import { InputManager } from "../logic/Input/InputManager";
-import { PlaceBeamInputMode } from "../logic/Input/PlaceBeamInputMode";
+import { CreateBeamInputMode } from "../logic/Input/CreateBeamInputMode";
 import { SelectBeamInputMode } from "../logic/Input/SelectBeamInputMode";
 import { MeasurementDisplay } from "../logic/MeasurementDisplay";
 import { PostProcessingManager } from "../logic/PostProcessingManager";

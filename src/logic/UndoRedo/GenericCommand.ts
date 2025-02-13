@@ -1,7 +1,7 @@
-import { UndoableCommand } from "../../UndoRedo/UndoableCommand";
-import { Beam } from "../Beam";
+import { UndoableCommand } from "./UndoableCommand";
+import { Beam } from "../Beam/Beam";
 
-export class GenericBeamCommand implements UndoableCommand {
+export class GenericCommand implements UndoableCommand {
     constructor(
         private executeFn: () => void,
         private undoFn: () => void,

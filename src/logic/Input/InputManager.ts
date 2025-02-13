@@ -4,7 +4,7 @@ import { AppState } from "../AppState";
 import { BeamManager } from "../Beam/BeamManager";
 import { UndoRedoExecutor } from "../UndoRedo/UndoManager";
 import { InputMode } from "./InputMode";
-import { PlaceBeamInputMode } from "./PlaceBeamInputMode";
+import { CreateBeamInputMode } from "./CreateBeamInputMode";
 import { SelectBeamInputMode } from "./SelectBeamInputMode";
 import * as THREE from "three";
 
@@ -28,7 +28,7 @@ export class InputManager {
         eventBus.on(EVENT_GUI_INPUT_MODE_CHANGED, () => {
             switch (this.appState.guiState.inputMode) {
                 case 'place-beam':
-                    this.changeInputMode(new PlaceBeamInputMode(this.beamManager));
+                    this.changeInputMode(new CreateBeamInputMode(this.beamManager));
                     break;
                 case 'select-beam':
                     this.changeInputMode(new SelectBeamInputMode(this.beamManager));

@@ -3,7 +3,7 @@ import { eventBus } from "../../events/EventBus";
 import { AppState } from "../AppState";
 import { Beam } from "../Beam/Beam";
 import { BeamManager } from "../Beam/BeamManager";
-import { GenericBeamCommand } from "../Beam/Commands/GenericBeamCommand";
+import { GenericCommand } from "../UndoRedo/GenericCommand";
 import { UndoRedoExecutor } from "../UndoRedo/UndoManager";
 import { InputMode } from "./InputMode";
 import * as THREE from "three";
@@ -33,6 +33,7 @@ export class SelectBeamInputMode extends InputMode {
     hoveredBeamFace: THREE.Face | null = null;
     lastSnapPosition: THREE.Vector3 | null = null;
     alignToolState: AlignToolState = new AlignToolState();
+    startingBeamPosition: THREE.Vector3 | null = null;
 
     constructor(private beamManager: BeamManager) {
         super();
@@ -68,6 +69,7 @@ export class SelectBeamInputMode extends InputMode {
             this.mousePositionRelativeToBeam = intersection.clone().sub(beam.position);
             this.curMouseIntersection = intersection.clone();
             this.prevMouseIntersection = this.curMouseIntersection.clone();
+            this.startingBeamPosition = beam.position.clone();
         } else {
             this.appState.selectedBeam = null;
             this.prevMouseIntersection = null;
@@ -86,7 +88,7 @@ export class SelectBeamInputMode extends InputMode {
             const adjustmentQuat = new THREE.Quaternion().setFromUnitVectors(faceNormalWorld, down);
             const originalQuaternion = this.hoveredBeam.quaternion.clone();
 
-            const command = new GenericBeamCommand(
+            const command = new GenericCommand(
                 () => {
                     if (!this.hoveredBeam) {
                         console.error('Something went wrong when executing or re-doing this command.');
@@ -115,7 +117,6 @@ export class SelectBeamInputMode extends InputMode {
         if (intersects.length > 0 && intersects[0].face) {
             const beam = intersects[0].object as Beam;
             const face = intersects[0].face;
-
 
             if (!this.alignToolState.highlightId1) {
                 this.alignToolState.beam1 = beam;
@@ -419,6 +420,22 @@ export class SelectBeamInputMode extends InputMode {
     onMouseUp(event: MouseEvent): void {
         if (event.button !== 0) return;
         this.mouse1Down = false;
+
+        const beam = this.appState.selectedBeam;
+        if (!beam || !this.startingBeamPosition)
+            return;
+        const currentPosition = beam.position.clone();
+        const previousPosition = this.startingBeamPosition.clone();
+        const command = new GenericCommand(
+            () => {
+                beam.position.copy(currentPosition);
+                this.startingBeamPosition = null;
+            },
+            () => {
+                beam.position.copy(previousPosition);
+            }
+        );
+        UndoRedoExecutor.executeCommand(command);
     }
 
     onKeyDown(event: KeyboardEvent): void {

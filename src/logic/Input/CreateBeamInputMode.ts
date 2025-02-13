@@ -1,13 +1,13 @@
 import { AppState } from "../AppState";
 import { Beam } from "../Beam/Beam";
 import { BeamManager } from "../Beam/BeamManager";
-import { GenericBeamCommand } from "../Beam/Commands/GenericBeamCommand";
+import { GenericCommand } from "../UndoRedo/GenericCommand";
 import { MoveBeamCommand } from "../Beam/Commands/MoveBeam";
 import { UndoRedoExecutor } from "../UndoRedo/UndoManager";
 import { InputMode } from "./InputMode";
 import * as THREE from "three";
 
-export class PlaceBeamInputMode extends InputMode {
+export class CreateBeamInputMode extends InputMode {
     private appState: AppState;
     private ghostBeam: Beam;
     private orientation: THREE.Vector3 = new THREE.Vector3(0, 0, 1);
@@ -41,7 +41,7 @@ export class PlaceBeamInputMode extends InputMode {
 
         const newBeam = this.ghostBeam.clone();
         newBeam.setOpacity(1);
-        const command = new GenericBeamCommand(
+        const command = new GenericCommand(
             () => {
                 this.beamManager.addBeam(newBeam);
             },
