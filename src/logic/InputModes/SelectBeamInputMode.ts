@@ -13,6 +13,10 @@ export class AlignToolState {
     beam2Face: THREE.Face | null = null;
     highlightId1: string | null = null;
     highlightId2: string | null = null;
+
+    public isStateComplete(): boolean {
+        return !!(this.beam1 && this.beam2 && this.beam1Face && this.beam2Face && this.highlightId1 && this.highlightId2);
+    }
 }
 
 export class SelectBeamInputMode extends InputMode {
@@ -39,92 +43,12 @@ export class SelectBeamInputMode extends InputMode {
         this.mouse1Down = true;
 
         if (this.appState.keysDown.has('f')) {
-            if (this.hoveredBeam && this.hoveredBeamFace) {
-                const down = new THREE.Vector3(0, -1, 0);
-                const faceNormalWorld = this.hoveredBeamFace.normal.clone().applyQuaternion(this.hoveredBeam.quaternion);
-                const adjustmentQuat = new THREE.Quaternion().setFromUnitVectors(faceNormalWorld, down);
-                this.hoveredBeam.quaternion.premultiply(adjustmentQuat);
-                this.appState.selectedBeam = this.hoveredBeam;
-            }
+            this.alignBeamFaceToGround();
             return;
         }
 
         if (this.appState.keysDown.has('a')) {
-            const rayCaster = new THREE.Raycaster();
-            rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
-            const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
-
-            if (intersects.length > 0) {
-                const beam = intersects[0].object as Beam;
-                const face = intersects[0].face;
-
-                if (!face) return;
-
-                if (!this.alignToolState.highlightId1) {
-                    this.alignToolState.beam1 = beam;
-                    this.alignToolState.beam1Face = face;
-                    this.alignToolState.highlightId1 = this.handleFaceHighlight(new THREE.Color(0x0000ff), 'align-face-highlight-1');
-                } else if (!this.alignToolState.highlightId2 && beam !== this.alignToolState.beam1) {
-                    this.alignToolState.beam2 = beam;
-                    this.alignToolState.beam2Face = face;
-                    this.alignToolState.highlightId2 = this.handleFaceHighlight(new THREE.Color(0x0044ff), 'align-face-highlight-2');
-                }
-
-                if (this.alignToolState.beam1 && this.alignToolState.beam2) {
-                    // Align the two faces.
-                    const beam1 = this.alignToolState.beam1;
-                    const beam2 = this.alignToolState.beam2;
-                    const face1 = this.alignToolState.beam1Face;
-                    const face2 = this.alignToolState.beam2Face;
-
-                    if (!beam1 || !beam2 || !face1 || !face2) {
-                        return;
-                    }
-
-                    function computeFaceCentroid(beam: any, face: any): THREE.Vector3 {
-                        const centroid = new THREE.Vector3();
-                        const geometry = beam.geometry;
-                        if (geometry.isBufferGeometry) {
-                            const posAttr = geometry.attributes.position;
-                            const vA = new THREE.Vector3().fromBufferAttribute(posAttr, face.a);
-                            const vB = new THREE.Vector3().fromBufferAttribute(posAttr, face.b);
-                            const vC = new THREE.Vector3().fromBufferAttribute(posAttr, face.c);
-                            centroid.add(vA).add(vB).add(vC).divideScalar(3);
-                        } else {
-                            centroid.add(geometry.vertices[face.a])
-                                .add(geometry.vertices[face.b])
-                                .add(geometry.vertices[face.c])
-                                .divideScalar(3);
-                        }
-                        beam.localToWorld(centroid);
-                        return centroid;
-                    }
-
-                    const centroid1 = computeFaceCentroid(beam1, face1);
-                    const centroid2 = computeFaceCentroid(beam2, face2);
-
-                    // Compute beam2's face world normal.
-                    const face2Normal = face2.normal.clone().applyQuaternion(beam2.quaternion).normalize();
-
-                    // Create a plane from beam2's face.
-                    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(face2Normal, centroid2);
-
-                    // Calculate how far beam1's face centroid is from the plane.
-                    const distance = plane.distanceToPoint(centroid1);
-
-                    // Project centroid1 onto the plane.
-                    const projectedPoint = centroid1.clone().add(face2Normal.multiplyScalar(-distance));
-
-                    // Offset beam1 so that its face centroid coincides with the projected point.
-                    const offset = projectedPoint.sub(centroid1);
-                    beam1.position.add(offset);
-
-                    this.alignToolState.beam1.removeHighlights('align-face-highlight-1');
-                    this.alignToolState.beam2.removeHighlights('align-face-highlight-2');
-                    this.alignToolState = new AlignToolState();
-                }
-            }
-
+            this.computeAndAlignBeamFaces();
             return;
         }
 
@@ -152,17 +76,115 @@ export class SelectBeamInputMode extends InputMode {
         eventBus.emit(EVENT_BEAM_SELECTION_CHANGED);
     }
 
+    private alignBeamFaceToGround() {
+        if (this.hoveredBeam && this.hoveredBeamFace) {
+            const down = new THREE.Vector3(0, -1, 0);
+            const faceNormalWorld = this.hoveredBeamFace.normal.clone().applyQuaternion(this.hoveredBeam.quaternion);
+            const adjustmentQuat = new THREE.Quaternion().setFromUnitVectors(faceNormalWorld, down);
+            this.hoveredBeam.quaternion.premultiply(adjustmentQuat);
+            this.appState.selectedBeam = this.hoveredBeam;
+        }
+    }
+
+    private computeAndAlignBeamFaces() {
+        const rayCaster = new THREE.Raycaster();
+        rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
+        const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
+
+        if (intersects.length > 0 && intersects[0].face) {
+            const beam = intersects[0].object as Beam;
+            const face = intersects[0].face;
+
+
+            if (!this.alignToolState.highlightId1) {
+                this.alignToolState.beam1 = beam;
+                this.alignToolState.beam1Face = face;
+                this.alignToolState.highlightId1 = this.handleFaceHighlight(beam, face, new THREE.Color(0xff4444), 'align-face-highlight-1');
+            } else if (!this.alignToolState.highlightId2 && beam !== this.alignToolState.beam1) {
+                this.alignToolState.beam2 = beam;
+                this.alignToolState.beam2Face = face;
+                this.alignToolState.highlightId2 = this.handleFaceHighlight(beam, face, new THREE.Color(0x0000ff), 'align-face-highlight-2');
+            }
+
+            if (!!this.alignToolState && this.alignToolState.isStateComplete()) {
+                // Align the two faces.
+                const beam1 = this.alignToolState.beam1!;
+                const beam2 = this.alignToolState.beam2!;
+                const face1 = this.alignToolState.beam1Face!;
+                const face2 = this.alignToolState.beam2Face!;
+
+
+                function computeFaceCentroid(beam: any, face: any): THREE.Vector3 {
+                    const centroid = new THREE.Vector3();
+                    const geometry = beam.geometry;
+                    if (geometry.isBufferGeometry) {
+                        const posAttr = geometry.attributes.position;
+                        const vA = new THREE.Vector3().fromBufferAttribute(posAttr, face.a);
+                        const vB = new THREE.Vector3().fromBufferAttribute(posAttr, face.b);
+                        const vC = new THREE.Vector3().fromBufferAttribute(posAttr, face.c);
+                        centroid.add(vA).add(vB).add(vC).divideScalar(3);
+                    } else {
+                        centroid.add(geometry.vertices[face.a])
+                            .add(geometry.vertices[face.b])
+                            .add(geometry.vertices[face.c])
+                            .divideScalar(3);
+                    }
+                    beam.localToWorld(centroid);
+                    return centroid;
+                }
+
+                const centroid1 = computeFaceCentroid(beam1, face1);
+                const centroid2 = computeFaceCentroid(beam2, face2);
+
+                // Compute beam2's face world normal.
+                const face2Normal = face2.normal.clone().applyQuaternion(beam2.quaternion).normalize();
+
+                // Create a plane from beam2's face.
+                const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(face2Normal, centroid2);
+
+                // Calculate how far beam1's face centroid is from the plane.
+                const distance = plane.distanceToPoint(centroid1);
+
+                // Project centroid1 onto the plane.
+                const projectedPoint = centroid1.clone().add(face2Normal.multiplyScalar(-distance));
+
+                // Offset beam1 so that its face centroid coincides with the projected point.
+                const offset = projectedPoint.sub(centroid1);
+                beam1.position.add(offset);
+
+                beam1.removeHighlights('align-face-highlight-1');
+                beam2.removeHighlights('align-face-highlight-2');
+                this.alignToolState = new AlignToolState();
+            }
+        }
+    }
+
     onMouseMove(event: MouseEvent): void {
         this.clearHighlights('temp-highlight');
 
-        if (this.appState.keysDown.has('f')) {
-            this.handleFaceHighlight(new THREE.Color(0x00ff00), 'temp-highlight');
+        const intersects = this.getHoveredBeam();
+
+        if (this.appState.keysDown.has('f') && intersects.length > 0) {
+            if (intersects[0].face) {
+                this.handleFaceHighlight(intersects[0].object as Beam, intersects[0].face, new THREE.Color(0x00ff00), 'temp-highlight');
+            }
             return;
         }
 
-        if (this.appState.keysDown.has('a')) {
-            this.handleFaceHighlight(new THREE.Color(0x0000ff), 'temp-highlight');
+        if (this.appState.keysDown.has('a') && intersects.length > 0) {
+            // TODO:
+            // Only highlight collinear faces (faces with normals that are collinear);
+            const face = intersects[0].face;
+            const beam = intersects[0].object;
+            if (face && beam != this.alignToolState.beam1 && beam != this.alignToolState.beam2) {
+                this.handleFaceHighlight(intersects[0].object as Beam, face, new THREE.Color(0x0000ff), 'temp-highlight');
+            }
             return;
+        }
+        if (!this.appState.keysDown.has('a')) {
+            this.clearHighlights('align-face-highlight-1');
+            this.clearHighlights('align-face-highlight-2');
+            this.alignToolState = new AlignToolState();
         }
 
         this.handleBeamMove();
@@ -172,41 +194,32 @@ export class SelectBeamInputMode extends InputMode {
         this.beamManager.getBeams().forEach(beam => beam.removeHighlights(type));
     }
 
-    private handleFaceHighlight(color: THREE.Color, highlightType: string): string | null {
+    private handleFaceHighlight(beam: Beam, face: THREE.Face, color: THREE.Color, highlightType: string): string | null {
+        const id = beam.highlightFace(face, color, highlightType);
+        this.hoveredBeam = beam;
+        this.hoveredBeamFace = face;
+        return id;
+    }
+
+    private getHoveredBeam() {
         const rayCaster = new THREE.Raycaster();
         rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
         const intersects = rayCaster.intersectObjects(this.beamManager.getBeams(), false);
-
-        if (intersects.length > 0 && intersects[0].face) {
-            const beam = intersects[0].object as Beam;
-            const id = beam.highlightFace(intersects[0].face, color, highlightType);
-            this.hoveredBeam = beam;
-            this.hoveredBeamFace = intersects[0].face;
-            return id;
-        }
-
-        this.hoveredBeam = null;
-        this.hoveredBeamFace = null;
-        return null;
+        return intersects;
     }
 
-    /** Moves the selected beam using your original snapping logic */
     private handleBeamMove(): void {
         const beam = this.appState.selectedBeam;
         if (!beam || !this.mouse1Down || !this.prevMouseIntersection || !this.intersectionOnBeam || !this.mousePositionRelativeToBeam) {
             return;
         }
 
-        // Set up the raycaster to determine an intersection with other beams.
         const rayCaster = new THREE.Raycaster();
         rayCaster.setFromCamera(this.appState.mousePos, this.appState.camera);
         const otherBeams = this.beamManager.getBeams().filter(b => b !== beam);
         const intersects = rayCaster.intersectObjects(otherBeams, false);
 
-        // Determine which face of the beam to use (to compute a Y offset).
         const candidateFace = this.getBottomFace(beam);
-
-        // Compute a new intersection point (and Y position) using a horizontal plane.
         let intersectionPos = new THREE.Vector3();
         let posY = beam.position.y;
         const intersectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.intersectionOnBeam.y);
@@ -222,39 +235,27 @@ export class SelectBeamInputMode extends InputMode {
             posY = candidateFace.offset;
         }
 
-        // Calculate the base movement delta.
         this.curMouseIntersection = intersectionPos;
-        // let deltaX = this.curMouseIntersection.x - this.prevMouseIntersection.x;
-        // let deltaZ = this.curMouseIntersection.z - this.prevMouseIntersection.z;
         let posX = this.curMouseIntersection.x - this.mousePositionRelativeToBeam.x;
         let posZ = this.curMouseIntersection.z - this.mousePositionRelativeToBeam.z;
 
-        // Define snapping thresholds.
         const snapThreshold = 0.75;
         const edgeSnapThreshold = 0.75;
 
         const mouseBeamPos = this.mousePositionRelativeToBeam.clone().add(beam.position);
 
+        let snapVertexPos: THREE.Vector3 | null = null;
         if (hoveredBeam && !this.lastSnapPosition) {
-            const snapVertexPos = this.snapToHoveredBeamVertices(beam, hoveredBeam, mouseBeamPos, snapThreshold);
+            snapVertexPos = this.snapToHoveredBeamVertices(beam, hoveredBeam, mouseBeamPos, snapThreshold);
             if (snapVertexPos) {
                 posX = snapVertexPos.x;
                 posZ = snapVertexPos.z;
                 posY = snapVertexPos.y;
-                if (snapVertexPos.distanceTo(beam.position) < 0.01) {
-                    // must be snapped by now:
-                    this.lastSnapPosition = snapVertexPos;
-                    //this.mousePositionRelativeToBeam.add(snapVertexPos.clone().sub(beam.position));
-                    console.log('setting LAST SNAP POS')
-                    if (Math.abs(beam.position.y - posY) > 0.01) {
-                        this.intersectionOnBeam.setY(posY + (this.intersectionOnBeam.y - beam.position.y));
-                    }
-                }
-                console.log('SNAPPING', posX, posY, posZ);
+                this.lastSnapPosition = snapVertexPos;
             }
         }
 
-        // Apply key–modifier constraints.
+        // Apply axis align, key–modifier constraints.
         if (this.appState.keysDown.has('z')) {
             posX = 0;
             posY = beam.position.y;
@@ -264,30 +265,19 @@ export class SelectBeamInputMode extends InputMode {
             posY = beam.position.y;
         }
 
-
-        // ****************
-        // TODO: Combine these two if statements - refactor:
-        if (!this.lastSnapPosition) {
-            if (Math.abs(beam.position.y - posY) > 0.01) {
-                this.intersectionOnBeam.setY(posY + (this.intersectionOnBeam.y - beam.position.y));
-            }
-
-            beam.position.setY(posY);
-            beam.position.setX(posX);
-            beam.position.setZ(posZ);
-        }
-
         if (this.lastSnapPosition && beam.position.distanceTo(new THREE.Vector3(posX, posY, posZ)) > snapThreshold * 2) {
+            this.lastSnapPosition = null;
+        }
+
+        if (!this.lastSnapPosition || snapVertexPos) {
             if (Math.abs(beam.position.y - posY) > 0.01) {
                 this.intersectionOnBeam.setY(posY + (this.intersectionOnBeam.y - beam.position.y));
             }
-            this.lastSnapPosition = null;
+
             beam.position.setY(posY);
             beam.position.setX(posX);
             beam.position.setZ(posZ);
-            console.log('REMOVE SNAP', posX, posY, posZ);
         }
-        // ****************
 
         this.prevMouseIntersection = this.curMouseIntersection.clone();
     }
@@ -320,15 +310,10 @@ export class SelectBeamInputMode extends InputMode {
         return bestFace;
     }
 
-    /**
-     * Iterates over all vertices of the beam and returns an offset vector (if any)
-     * that aligns one of its vertices with a nearby vertex on another beam.
-     */
     // Helper to get all world-space vertices from a mesh's geometry.
     private getWorldVertices(mesh: Beam): THREE.Vector3[] {
         mesh.updateMatrixWorld(true);
         let geo = mesh.geometry;
-        // Ensure non-indexed geometry for simplicity.
         if (geo.index) {
             geo = geo.toNonIndexed();
         }
@@ -364,50 +349,26 @@ export class SelectBeamInputMode extends InputMode {
         return null;
     }
 
-    // private performVertexSnapping(movingBeam: Beam, snapThreshold: number): THREE.Vector3 | null {
-    //     const movingVertices = this.getWorldVertices(movingBeam);
-    //     // Iterate over all other beams.
-    //     for (const otherBeam of this.beamManager.getBeams()) {
-    //         if (otherBeam === movingBeam) continue;
-    //         const otherVertices = this.getWorldVertices(otherBeam);
-    //         // Compare each vertex of the moving beam with each vertex from the other beam.
-    //         for (const movingVertex of movingVertices) {
-    //             for (const otherVertex of otherVertices) {
-    //                 if (movingVertex.distanceTo(otherVertex) < snapThreshold) {
-    //                     return otherVertex.clone().sub(movingVertex);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return null;
-    // }
-
     private performEdgeSnapping(beam: Beam, deltaX: number, deltaZ: number, edgeSnapThreshold: number): THREE.Vector3 | null {
-        // Translate the beam's current bounds
         const translation = new THREE.Vector3(deltaX, 0, deltaZ);
         const currentBox = new THREE.Box3().setFromObject(beam);
         const predictedBox = currentBox.clone().translate(translation);
 
-        // Define the axes we want to consider.
         const axes = ['x', 'z'] as const;
         const predictedEdges: Record<typeof axes[number], [number, number]> = {
             x: [predictedBox.min.x, predictedBox.max.x],
             z: [predictedBox.min.z, predictedBox.max.z],
         };
 
-        // Store the best snapping difference for each axis (if any)
         const bestDiff: Record<typeof axes[number], number | null> = { x: null, z: null };
 
-        // Iterate over each axis
         for (const axis of axes) {
-            // Loop through all other beams
             for (const otherBeam of this.beamManager.getBeams()) {
                 if (otherBeam === beam) continue;
                 const otherBox = new THREE.Box3().setFromObject(otherBeam);
                 const otherEdges: [number, number] = axis === 'x'
                     ? [otherBox.min.x, otherBox.max.x]
                     : [otherBox.min.z, otherBox.max.z];
-                // Compare each predicted edge with the corresponding edges of the other beam
                 for (const movingEdge of predictedEdges[axis]) {
                     for (const otherEdge of otherEdges) {
                         const diff = otherEdge - movingEdge;
@@ -466,7 +427,6 @@ export class SelectBeamInputMode extends InputMode {
         const beam = this.appState.selectedBeam;
         const down = new THREE.Vector3(0, -1, 0);
 
-        // Define candidate local face normals.
         const candidateFaces = [
             { name: 'left', vec: new THREE.Vector3(-1, 0, 0) },
             { name: 'right', vec: new THREE.Vector3(1, 0, 0) },
