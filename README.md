@@ -7,7 +7,15 @@ https://sladewasinger.github.io/LumberSketch/
 # Roadmap
 - [✅] Add x, y, & z axis to scene
 - [✅] Label each axis
-- [x] Change controls from click and drag to click once to start a beam, click again to end the beam
-- [x] Add ghost 2D projection of 2x4 beam under cursor
-- [x] Snap ghost 2D projection to other beams
+- [✅] Add ghost 2D projection of 2x4 beam under cursor
+- [✅] Add snapping to other beams
+- [✅] Add "align face" tool (hold [a] with select tool, click on 1st beam's face, click on 2nd beam's face)
+- [✅] Add "place face on ground" tool (hold [f] with select tool, click on desired beam's face)
+- [✅] Add "snap to axis" functionality (hold [z], [x], or [c] with select tool, click and drag a beam along desired axis)
+- [x] Add undo and redo functionality
 - [x] Add copy and paste functionality
+- [x] Add cut tool
+    - [x] Add ability to cut along length of beam (use CursorProjection code)
+    - [x] Add ability to type out exact length of cut (from edge of beam)
+    - [x] Add ability for cut tool to snap to center of beam length
+- [x] Add ability to type out exact dimensions of beam when placing (should update in real time)
