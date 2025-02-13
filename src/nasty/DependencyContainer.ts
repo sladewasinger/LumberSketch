@@ -1,11 +1,11 @@
 import { AppState } from "../logic/AppState";
-import { BeamManager } from "../logic/BeamManager";
+import { BeamManager } from "../logic/Beam/BeamManager";
 import { ControlsManager } from "../logic/ControlsManager";
 import { CursorProjection } from "../logic/CursorProjection";
 import { GuiManager } from "../logic/GuiManager";
-import { InputManager } from "../logic/InputModes/InputManager";
-import { PlaceBeamInputMode } from "../logic/InputModes/PlaceBeamInputMode";
-import { SelectBeamInputMode } from "../logic/InputModes/SelectBeamInputMode";
+import { InputManager } from "../logic/Input/InputManager";
+import { PlaceBeamInputMode } from "../logic/Input/PlaceBeamInputMode";
+import { SelectBeamInputMode } from "../logic/Input/SelectBeamInputMode";
 import { MeasurementDisplay } from "../logic/MeasurementDisplay";
 import { PostProcessingManager } from "../logic/PostProcessingManager";
 import { SceneManager } from "../logic/SceneManager";

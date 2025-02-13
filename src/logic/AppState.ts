@@ -1,4 +1,4 @@
-import { Beam } from "./Beam";
+import { Beam } from "./Beam/Beam";
 import * as THREE from "three";
 
 export type GuiInputMode = 'place-beam' | 'select-beam' | 'cut-beam' | null;

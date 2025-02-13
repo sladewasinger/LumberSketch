@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Beam } from './Beam';
+import { Beam } from './Beam/Beam';
 import { getGroundIntersection, roundToNearest3D } from './Utils';
-import { BeamManager } from './BeamManager';
+import { BeamManager } from './Beam/BeamManager';
 import { AppState } from './AppState';
 
 export class CursorProjection {

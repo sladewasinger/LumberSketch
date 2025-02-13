@@ -1,7 +1,8 @@
 import { EVENT_GUI_INPUT_MODE_CHANGED } from "../../events/Constants";
 import { eventBus } from "../../events/EventBus";
 import { AppState } from "../AppState";
-import { BeamManager } from "../BeamManager";
+import { BeamManager } from "../Beam/BeamManager";
+import { UndoRedoExecutor } from "../UndoRedo/UndoManager";
 import { InputMode } from "./InputMode";
 import { PlaceBeamInputMode } from "./PlaceBeamInputMode";
 import { SelectBeamInputMode } from "./SelectBeamInputMode";
@@ -71,7 +72,16 @@ export class InputManager {
     onKeyDown(event: KeyboardEvent) {
         const key = event.key.toLowerCase();
         this.appState.keysDown.add(event.key.toLowerCase());
-        this.inputMode?.onKeyDown(event);
+
+        if (event.ctrlKey && key === 'z') {
+            UndoRedoExecutor.undo();
+        } else if (event.ctrlKey && key === 'r') {
+            // prevent default
+            event.preventDefault();
+            UndoRedoExecutor.redo();
+        } else {
+            this.inputMode?.onKeyDown(event);
+        }
     }
 
     onKeyUp(event: KeyboardEvent) {

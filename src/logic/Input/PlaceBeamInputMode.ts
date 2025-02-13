@@ -1,6 +1,9 @@
 import { AppState } from "../AppState";
-import { Beam } from "../Beam";
-import { BeamManager } from "../BeamManager";
+import { Beam } from "../Beam/Beam";
+import { BeamManager } from "../Beam/BeamManager";
+import { GenericBeamCommand } from "../Beam/Commands/GenericBeamCommand";
+import { MoveBeamCommand } from "../Beam/Commands/MoveBeam";
+import { UndoRedoExecutor } from "../UndoRedo/UndoManager";
 import { InputMode } from "./InputMode";
 import * as THREE from "three";
 
@@ -38,7 +41,15 @@ export class PlaceBeamInputMode extends InputMode {
 
         const newBeam = this.ghostBeam.clone();
         newBeam.setOpacity(1);
-        this.beamManager.addBeam(newBeam);
+        const command = new GenericBeamCommand(
+            () => {
+                this.beamManager.addBeam(newBeam);
+            },
+            () => {
+                this.beamManager.deleteBeam(newBeam);
+            }
+        );
+        UndoRedoExecutor.executeCommand(command);
     }
 
     onKeyDown(event: KeyboardEvent): void {

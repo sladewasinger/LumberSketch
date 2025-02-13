@@ -1,8 +1,10 @@
 import { EVENT_BEAM_SELECTION_CHANGED } from "../../events/Constants";
 import { eventBus } from "../../events/EventBus";
 import { AppState } from "../AppState";
-import { Beam } from "../Beam";
-import { BeamManager } from "../BeamManager";
+import { Beam } from "../Beam/Beam";
+import { BeamManager } from "../Beam/BeamManager";
+import { GenericBeamCommand } from "../Beam/Commands/GenericBeamCommand";
+import { UndoRedoExecutor } from "../UndoRedo/UndoManager";
 import { InputMode } from "./InputMode";
 import * as THREE from "three";
 
@@ -77,12 +79,31 @@ export class SelectBeamInputMode extends InputMode {
     }
 
     private alignBeamFaceToGround() {
+
         if (this.hoveredBeam && this.hoveredBeamFace) {
             const down = new THREE.Vector3(0, -1, 0);
             const faceNormalWorld = this.hoveredBeamFace.normal.clone().applyQuaternion(this.hoveredBeam.quaternion);
             const adjustmentQuat = new THREE.Quaternion().setFromUnitVectors(faceNormalWorld, down);
-            this.hoveredBeam.quaternion.premultiply(adjustmentQuat);
-            this.appState.selectedBeam = this.hoveredBeam;
+            const originalQuaternion = this.hoveredBeam.quaternion.clone();
+
+            const command = new GenericBeamCommand(
+                () => {
+                    if (!this.hoveredBeam) {
+                        console.error('Something went wrong when executing or re-doing this command.');
+                        return;
+                    }
+                    this.hoveredBeam.quaternion.premultiply(adjustmentQuat);
+                    this.appState.selectedBeam = this.hoveredBeam;
+                },
+                () => {
+                    if (!this.hoveredBeam) {
+                        console.error('Something went wrong when undoing this command.');
+                        return;
+                    }
+                    this.hoveredBeam.quaternion.copy(originalQuaternion);
+                }
+            );
+            UndoRedoExecutor.executeCommand(command);
         }
     }
 

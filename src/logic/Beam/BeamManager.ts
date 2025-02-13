@@ -1,9 +1,9 @@
 // src/BeamManager.ts
 import * as THREE from 'three';
+import { EVENT_BEAM_SELECTION_CHANGED } from '../../events/Constants';
+import { eventBus } from '../../events/EventBus';
+import { AppState } from '../AppState';
 import { Beam } from './Beam';
-import { eventBus } from '../events/EventBus';
-import { EVENT_BEAM_SELECTION_CHANGED } from '../events/Constants';
-import { AppState } from './AppState';
 
 export class BeamManager {
     private beamsGroup: THREE.Group;

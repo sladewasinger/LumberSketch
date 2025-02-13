@@ -1,6 +1,6 @@
 // src/InputManager.ts
 import * as THREE from 'three';
-import { Beam } from '../Beam';
+import { Beam } from '../Beam/Beam';
 import { BeamManager } from '../BeamManager';
 import { MeasurementDisplay } from '../MeasurementDisplay';
 import {
