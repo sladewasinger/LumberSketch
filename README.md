@@ -3,6 +3,7 @@ LumberSketch is a 3D web app for quickly sketching 3D models using actual lumber
 
 https://sladewasinger.github.io/LumberSketch/
 
+<img src="readme_screenshot.png" alt="LumberSketch Screenshot" width="600"/>
 
 # Roadmap
 - [✅] Add x, y, & z axis to scene
