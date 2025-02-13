@@ -21,7 +21,6 @@ export class BeamManager {
             for (let beam of this.beams) {
                 if (this.appState.selectedBeam !== null && this.appState.selectedBeam === beam) {
                     beam.isSelected = true;
-                    console.log("Selected beam: ", beam);
                 } else {
                     beam.isSelected = false;
                 }

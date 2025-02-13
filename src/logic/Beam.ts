@@ -10,6 +10,8 @@ export interface BeamDimensions {
 export class Beam extends THREE.Mesh {
     public dimensions: BeamDimensions;
 
+    private highlights: THREE.Mesh[] = [];
+
     constructor(dimensions: BeamDimensions, material?: THREE.Material) {
         const geometry = new THREE.BoxGeometry(
             dimensions.length,
@@ -32,16 +34,6 @@ export class Beam extends THREE.Mesh {
         // Disable raycasting on the outline mesh to avoid click and drag:
         outlineMesh.raycast = () => [];
         this.add(outlineMesh);
-
-        // const positionAttribute = this.geometry.getAttribute('position');
-        // const colors = [];
-        // const color = new THREE.Color('white');
-        // for (let i = 0; i < positionAttribute.count; i += 3) {
-        //     colors.push(color.r, color.g, color.b);
-        //     colors.push(color.r, color.g, color.b);
-        //     colors.push(color.r, color.g, color.b);
-        // }
-        // this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     }
 
     public set isSelected(value: boolean) {
@@ -73,16 +65,16 @@ export class Beam extends THREE.Mesh {
         return newBeam as this;
     }
 
-    public removeHighlights() {
-        const highlight = this.getObjectByName('highlight');
-        if (highlight) {
-            this.remove(highlight);
+    public removeHighlights(type?: string) {
+        for (const highlight of this.highlights) {
+            if (type == null || highlight.userData.type === type)
+                this.remove(highlight);
         }
     }
 
-    public highlightFace(face: THREE.Face, color: THREE.Color) {
+    public highlightFace(face: THREE.Face, color: THREE.Color, highlightType: string): string {
         // Remove any existing highlight mesh.
-        const existing = this.getObjectByName('highlight');
+        const existing = this.getObjectByName('highlight' + face.a + '-' + face.b + '-' + face.c);
         if (existing) {
             this.remove(existing);
         }
@@ -142,9 +134,15 @@ export class Beam extends THREE.Mesh {
             opacity: 0.7
         });
 
+        const uniqueId = crypto.randomUUID();
+
         // Create the highlight mesh and add it to the beam.
         const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
-        highlightMesh.name = 'highlight';
+        highlightMesh.name = 'highlight-' + face.a + '-' + face.b + '-' + face.c;
+        highlightMesh.userData = { type: highlightType, id: uniqueId };
+        this.highlights.push(highlightMesh);
         this.add(highlightMesh);
+
+        return uniqueId;
     }
 }
