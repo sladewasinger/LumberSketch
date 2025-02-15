@@ -22,7 +22,7 @@ https://sladewasinger.github.io/LumberSketch/
     - [ ] Add ability for cut tool to snap to center of beam length
 - [ ] Add ability to type out exact dimensions of beam when placing (should update in real time)
 - [ ] Add tape measure tool 📏 for measuring distances between vertices
-- [ ] Add 
+- [ ] Add ruler tool to place guidlines
 - [ ] Add lumber shopping list breakdown feature
     - [ ] Will give an optimized number of 8ft 2x4s tht are needed based on total length of beams, taking into account cuts/rounding error. For example, if you have 2 beams that are 4ft long, and 2 beam that are 6ft long, and 2 beams that are 2ft long, it will say you need 3 8ft 2x4s.
     - [ ] Add configurable 2x4 lumber lengths (8ft, 10ft, 12ft, etc.)
