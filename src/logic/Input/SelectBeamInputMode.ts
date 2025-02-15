@@ -81,7 +81,6 @@ export class SelectBeamInputMode extends InputMode {
     }
 
     private alignBeamFaceToGround() {
-
         if (this.hoveredBeam && this.hoveredBeamFace) {
             const down = new THREE.Vector3(0, -1, 0);
             const faceNormalWorld = this.hoveredBeamFace.normal.clone().applyQuaternion(this.hoveredBeam.quaternion);
@@ -249,8 +248,10 @@ export class SelectBeamInputMode extends InputMode {
         if (intersects.length > 0) {
             hoveredBeam = intersects[0].object as Beam;
             const y = intersects[0].point.y;
-            rayCaster.ray.intersectPlane(intersectionPlane, intersectionPos);
+            //rayCaster.ray.intersectPlane(intersectionPlane, intersectionPos);
             intersectionPos.setY(y);
+            intersectionPos.setX(intersects[0].point.x);
+            intersectionPos.setZ(intersects[0].point.z);
             posY = y + candidateFace.offset;
         } else {
             rayCaster.ray.intersectPlane(intersectionPlane, intersectionPos);
@@ -292,8 +293,10 @@ export class SelectBeamInputMode extends InputMode {
         }
 
         if (!this.lastSnapPosition || snapVertexPos) {
+            // Correct intersection on beam when dragging off or onto another beam (y was moved away from mouse)
             if (Math.abs(beam.position.y - posY) > 0.01) {
                 this.intersectionOnBeam.setY(posY + (this.intersectionOnBeam.y - beam.position.y));
+                //this.mousePositionRelativeToBeam.setY(this.intersectionOnBeam.y - beam.position.y);
             }
 
             beam.position.setY(posY);

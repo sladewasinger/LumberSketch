@@ -13,7 +13,7 @@ export class AppState {
     public camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(
         60,
         window.innerWidth / window.innerHeight,
-        0.1,
+        1,
         1000
     );
     public guiState: GuiState = {

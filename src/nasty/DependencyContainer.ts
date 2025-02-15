@@ -32,7 +32,7 @@ export class DependencyContainer {
         );
         this.beamManager = new BeamManager();
         this.measurementDisplay = new MeasurementDisplay(measurementDiv);
-        this.inputManager = new InputManager(this.beamManager);
+        this.inputManager = new InputManager(this.beamManager, this.sceneManager.renderer, this.measurementDisplay);
         this.cursorProjection = new CursorProjection(
             this.sceneManager.renderer,
             this.beamManager

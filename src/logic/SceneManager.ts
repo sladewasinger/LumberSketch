@@ -47,8 +47,8 @@ export class SceneManager {
 
         // Create Renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
-        this.onWindowResize();
         this.container.appendChild(this.renderer.domElement);
+        this.onWindowResize();
 
         // Add Grid Helper
         const gridHelper = new THREE.GridHelper(12 * 24, 12 * 24, 0xFFFFFF, 0x888888);

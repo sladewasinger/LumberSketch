@@ -7,6 +7,7 @@ import { InputMode } from "./InputMode";
 import { CreateBeamInputMode } from "./CreateBeamInputMode";
 import { SelectBeamInputMode } from "./SelectBeamInputMode";
 import * as THREE from "three";
+import { MeasurementDisplay } from "../MeasurementDisplay";
 
 export class InputManager {
     appState: AppState;
@@ -14,6 +15,8 @@ export class InputManager {
 
     constructor(
         private beamManager: BeamManager,
+        private renderer: THREE.WebGLRenderer,
+        private measurementDisplay: MeasurementDisplay,
     ) {
         this.appState = AppState.getInstance();
         if (!this.appState.container)
@@ -50,17 +53,23 @@ export class InputManager {
 
     onMouseDown(event: MouseEvent) {
         this.appState.mousePos.copy(new THREE.Vector2(
-            (event.clientX / window.innerWidth) * 2 - 1,
-            -(event.clientY / window.innerHeight) * 2 + 1
+            (event.offsetX / window.innerWidth) * 2 - 1,
+            -(event.offsetY / window.innerHeight) * 2 + 1
         ));
         this.inputMode?.onMouseDown(event);
     }
 
     onMouseMove(event: MouseEvent) {
+        var rect = this.renderer.domElement.getBoundingClientRect();
+        // mouse.x = ((event.clientX - rect.left) / (rect.right - rect.left)) * 2 - 1;
+        // mouse.y = - ((event.clientY - rect.top) / (rect.bottom - rect.top)) * 2 + 1;
+
         this.appState.mousePos.copy(new THREE.Vector2(
-            (event.clientX / window.innerWidth) * 2 - 1,
-            -(event.clientY / window.innerHeight) * 2 + 1
+            ((event.clientX - rect.left) / (rect.right - rect.left)) * 2 - 1,
+            - ((event.clientY - rect.top) / (rect.bottom - rect.top)) * 2 + 1
         ));
+
+        this.measurementDisplay.update(`{x: ${this.appState.mousePos.x.toFixed(2)}, y: ${this.appState.mousePos.y.toFixed(2)}}`);
 
         this.inputMode?.onMouseMove(event);
     }
