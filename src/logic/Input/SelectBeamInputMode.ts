@@ -171,7 +171,17 @@ export class SelectBeamInputMode extends InputMode {
 
                 // Offset beam1 so that its face centroid coincides with the projected point.
                 const offset = projectedPoint.sub(centroid1);
-                beam1.position.add(offset);
+
+                const originalBeamPosition = beam1.position.clone();
+                const command = new GenericCommand(
+                    () => {
+                        beam1.position.add(offset);
+                    },
+                    () => {
+                        beam1.position.copy(originalBeamPosition);
+                    }
+                );
+                UndoRedoExecutor.executeCommand(command);
 
                 beam1.removeHighlights('align-face-highlight-1');
                 beam2.removeHighlights('align-face-highlight-2');
@@ -445,7 +455,19 @@ export class SelectBeamInputMode extends InputMode {
         const key = event.key.toLowerCase();
         if (key === 'delete' || key === 'd') {
             if (this.appState.selectedBeam) {
-                this.beamManager.deleteBeam(this.appState.selectedBeam);
+                const originalBeam = this.appState.selectedBeam.clone();
+                const command = new GenericCommand(
+                    () => {
+                        if (this.appState.selectedBeam) {
+                            this.beamManager.deleteBeam(this.appState.selectedBeam);
+                        }
+                    },
+                    () => {
+                        this.beamManager.addBeam(originalBeam);
+                        this.appState.selectedBeam = originalBeam;
+                    }
+                );
+                UndoRedoExecutor.executeCommand(command);
             }
         }
 
@@ -500,7 +522,16 @@ export class SelectBeamInputMode extends InputMode {
             axis = bestFace!.worldNormal.clone().cross(down).normalize();
         }
         const rotQuat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-        beam.quaternion.copy(rotQuat.multiply(beam.quaternion.clone()));
+        const originalQuaternion = beam.quaternion.clone();
+        const command = new GenericCommand(
+            () => {
+                beam.quaternion.copy(rotQuat.multiply(beam.quaternion.clone()));
+            },
+            () => {
+                beam.quaternion.copy(originalQuaternion);
+            }
+        );
+        UndoRedoExecutor.executeCommand(command);
     }
 
     destroy(): void {
